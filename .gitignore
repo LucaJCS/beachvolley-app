@@ -4,3 +4,4 @@ __pycache__
 sports.db
 *.sqlite
 *.log
+.venv/

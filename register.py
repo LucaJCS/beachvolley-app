@@ -1,5 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
+from tkinter import ttk  # Importa ttk per uno stile moderno
 import sqlite3
 
 # Funzione per registrare l'utente
@@ -9,28 +10,104 @@ def register_user():
     sport = combo_sport.get()
 
     if name and level and sport:
-        # Connettersi al database
+        # Verifica se il nome utente esiste già
         conn = sqlite3.connect('sports.db')
         cursor = conn.cursor()
-
-        # Inserire i dati nella tabella corrispondente allo sport scelto
-        if sport == "BeachVolley":
-            cursor.execute("INSERT INTO beachvolley (name, level) VALUES (?, ?)", (name, level))
-        elif sport == "Tennis":
-            cursor.execute("INSERT INTO tennis (name, level) VALUES (?, ?)", (name, level))
-        elif sport == "Calcetto":
-            cursor.execute("INSERT INTO calcetto (name, level) VALUES (?, ?)", (name, level))
-        elif sport == "Padel":
-            cursor.execute("INSERT INTO padel (name, level) VALUES (?, ?)", (name, level))
-
-        # Commit dei cambiamenti e chiusura della connessione
-        conn.commit()
+        cursor.execute("SELECT * FROM users WHERE name = ?", (name,))
+        existing_user = cursor.fetchone()
+        
+        if existing_user:
+            messagebox.showwarning("Errore", "Il nome utente è già in uso.")
+        else:
+            # Inserire i dati nella tabella corrispondente allo sport scelto
+            if sport == "BeachVolley":
+                cursor.execute("INSERT INTO beachvolley (name, level) VALUES (?, ?)", (name, level))
+            elif sport == "Tennis":
+                cursor.execute("INSERT INTO tennis (name, level) VALUES (?, ?)", (name, level))
+            elif sport == "Calcetto":
+                cursor.execute("INSERT INTO calcetto (name, level) VALUES (?, ?)", (name, level))
+            elif sport == "Padel":
+                cursor.execute("INSERT INTO padel (name, level) VALUES (?, ?)", (name, level))
+            
+            # Creare la tabella utenti se non esiste
+            cursor.execute("CREATE TABLE IF NOT EXISTS users (id INTEGER PRIMARY KEY AUTOINCREMENT, name TEXT, level TEXT)")
+            cursor.execute("INSERT INTO users (name, level) VALUES (?, ?)", (name, level))
+            
+            conn.commit()
+            messagebox.showinfo("Registrazione riuscita", f"Utente {name} registrato con successo per {sport}!")
+            entry_name.delete(0, tk.END)
+            entry_name.insert(0, name)  # Inserire il nome utente nel campo per login
         conn.close()
-
-        messagebox.showinfo("Registrazione riuscita", f"Utente {name} registrato con successo per {sport}!")
-        entry_name.delete(0, tk.END)
     else:
         messagebox.showwarning("Errore", "Per favore, completa tutti i campi!")
+
+# Funzione di login (accesso)
+def login_user():
+    name = entry_name.get()
+
+    if name:
+        conn = sqlite3.connect('sports.db')
+        cursor = conn.cursor()
+        cursor.execute("SELECT * FROM users WHERE name = ?", (name,))
+        user = cursor.fetchone()
+
+        if user:
+            messagebox.showinfo("Benvenuto", f"Benvenuto, {name}!")
+            login_window.destroy()  # Chiudi la finestra di login
+            open_main_window(name)  # Apri la finestra principale
+        else:
+            messagebox.showwarning("Errore", "Il nome utente non esiste. Per favore, registrati.")
+        conn.close()
+    else:
+        messagebox.showwarning("Errore", "Inserisci il nome utente.")
+
+# Funzione per aprire la finestra principale
+def open_main_window(name):
+    # Crea la finestra principale
+    root = tk.Tk()
+    root.title("Gestione Eventi Sportivi")
+    root.geometry("500x500")
+
+    style = ttk.Style()
+    style.configure("TButton", font=("Helvetica", 12), padding=10, background="#444444", foreground="white")
+    style.configure("TLabel", font=("Helvetica", 12), padding=10, background="#2e2e2e", foreground="white")
+    style.configure("TEntry", font=("Helvetica", 12), padding=10)
+    style.configure("TOptionMenu", font=("Helvetica", 12), padding=10)
+
+    # Layout per la registrazione dell'utente (usando grid per una disposizione più spaziosa)
+    label_name = ttk.Label(root, text="Nome:")
+    label_name.grid(row=0, column=0, pady=10, padx=10, sticky="e")
+    entry_name = ttk.Entry(root, style="TEntry")
+    entry_name.grid(row=0, column=1, pady=10, padx=10)
+
+    label_level = ttk.Label(root, text="Livello di gioco:")
+    label_level.grid(row=1, column=0, pady=10, padx=10, sticky="e")
+    combo_level = ttk.Combobox(root, state="readonly", style="TEntry")
+    combo_level.set("Principiante")
+    combo_level['values'] = ("Principiante", "Intermedio", "Avanzato")
+    combo_level.grid(row=1, column=1, pady=10, padx=10)
+
+    label_sport = ttk.Label(root, text="Sport preferito:")
+    label_sport.grid(row=2, column=0, pady=10, padx=10, sticky="e")
+    combo_sport = ttk.Combobox(root, state="readonly", style="TEntry")
+    combo_sport.set("BeachVolley")
+    combo_sport['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
+    combo_sport.grid(row=2, column=1, pady=10, padx=10)
+
+    btn_register = ttk.Button(root, text="Registrati", command=register_user)
+    btn_register.grid(row=3, column=0, columnspan=2, pady=20)
+
+    # Pulsante per visualizzare utenti ed eventi
+    btn_show_users = ttk.Button(root, text="Visualizza Utenti", command=show_users)
+    btn_show_users.grid(row=4, column=0, columnspan=2, pady=10)
+
+    btn_create_event = ttk.Button(root, text="Crea Evento", command=create_event)
+    btn_create_event.grid(row=5, column=0, columnspan=2, pady=10)
+
+    btn_show_events = ttk.Button(root, text="Visualizza Eventi", command=show_events)
+    btn_show_events.grid(row=6, column=0, columnspan=2, pady=10)
+
+    root.mainloop()
 
 # Funzione per mostrare gli utenti registrati per lo sport selezionato
 def show_users():
@@ -77,7 +154,8 @@ def create_event():
         ''')
 
         # Inserire i dati dell'evento nella tabella
-        cursor.execute(f"INSERT INTO {sport.lower()}_events (event_name, event_date, event_location) VALUES (?, ?, ?)", (event_name, event_date, event_location))
+        cursor.execute(f"INSERT INTO {sport.lower()}_events (event_name, event_date, event_location) VALUES (?, ?, ?)", 
+                       (event_name, event_date, event_location))
 
         conn.commit()
         conn.close()
@@ -111,58 +189,22 @@ def show_events():
     
     conn.close()
 
-# Creazione della finestra principale
-root = tk.Tk()
-root.title("Registrazione Utente")
+# Finestra di login
+login_window = tk.Tk()
+login_window.title("Login / Registrazione")
+login_window.geometry("400x300")
 
-# Layout per la registrazione dell'utente
-label_name = tk.Label(root, text="Nome:")
-label_name.pack()
-entry_name = tk.Entry(root)
-entry_name.pack()
+# Layout per il login
+label_name = tk.Label(login_window, text="Nome utente:")
+label_name.pack(pady=10)
 
-label_level = tk.Label(root, text="Livello di gioco:")
-label_level.pack()
-combo_level = tk.StringVar(root)
-combo_level.set("Principiante")
-level_menu = tk.OptionMenu(root, combo_level, "Principiante", "Intermedio", "Avanzato")
-level_menu.pack()
+entry_name = tk.Entry(login_window)
+entry_name.pack(pady=10)
 
-label_sport = tk.Label(root, text="Sport preferito:")
-label_sport.pack()
-combo_sport = tk.StringVar(root)
-combo_sport.set("BeachVolley")  # Sport predefinito
-sport_menu = tk.OptionMenu(root, combo_sport, "BeachVolley", "Tennis", "Calcetto", "Padel")
-sport_menu.pack()
+btn_login = tk.Button(login_window, text="Accedi", command=login_user)
+btn_login.pack(pady=20)
 
-btn_register = tk.Button(root, text="Registrati", command=register_user)
-btn_register.pack()
+btn_register = tk.Button(login_window, text="Registrati", command=register_user)
+btn_register.pack(pady=10)
 
-# Layout per la creazione dell'evento
-label_event_name = tk.Label(root, text="Nome Evento:")
-label_event_name.pack()
-entry_event_name = tk.Entry(root)
-entry_event_name.pack()
-
-label_event_date = tk.Label(root, text="Data Evento:")
-label_event_date.pack()
-entry_event_date = tk.Entry(root)
-entry_event_date.pack()
-
-label_event_location = tk.Label(root, text="Location Evento:")
-label_event_location.pack()
-entry_event_location = tk.Entry(root)
-entry_event_location.pack()
-
-btn_create_event = tk.Button(root, text="Crea Evento", command=create_event)
-btn_create_event.pack()
-
-# Pulsanti per visualizzare utenti ed eventi
-btn_show_users = tk.Button(root, text="Visualizza Utenti", command=show_users)
-btn_show_users.pack()
-
-btn_show_events = tk.Button(root, text="Visualizza Eventi", command=show_events)
-btn_show_events.pack()
-
-# Avvio dell'applicazione Tkinter
-root.mainloop()
+login_window.mainloop()
