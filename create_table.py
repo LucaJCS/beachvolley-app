@@ -1,6 +1,6 @@
 import sqlite3
 
-# Connettersi al database (crea il file se non esiste)
+# Connettersi al database
 conn = sqlite3.connect('sports.db')
 cursor = conn.cursor()
 
