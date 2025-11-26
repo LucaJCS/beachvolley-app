@@ -1,6 +1,6 @@
 import tkinter as tk
 from tkinter import messagebox
-from tkinter import ttk  # Importa ttk per uno stile moderno
+from tkinter import ttk  # Importa ttk per uno stile più moderno
 import sqlite3
 
 # Creazione della tabella 'users' se non esiste già
@@ -8,7 +8,7 @@ def create_users_table():
     conn = sqlite3.connect('sports.db')
     cursor = conn.cursor()
     
-    # Crea la tabella 'users' se non esiste, aggiungendo la colonna password
+    # Crea la tabella 'users' se non esiste
     cursor.execute('''CREATE TABLE IF NOT EXISTS users (
                         id INTEGER PRIMARY KEY AUTOINCREMENT,
                         name TEXT NOT NULL UNIQUE,
@@ -33,6 +33,11 @@ SPORT_LIMITS = {
     "Padel": 4
 }
 
+# Variabili globali per le finestre persistenti
+users_window_instance = None
+events_window_instance = None
+create_event_window_instance = None
+
 # Funzione per creare tabella partecipanti per un evento
 def create_event_participants_table(sport, event_id):
     conn = sqlite3.connect('sports.db')
@@ -52,40 +57,50 @@ def register_to_event(sport, event_id, username):
     cursor = conn.cursor()
     
     try:
+        # Crea la tabella dei partecipanti se non esiste
+        cursor.execute(f'''CREATE TABLE IF NOT EXISTS {sport.lower()}_event_{event_id}_participants (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            username TEXT NOT NULL UNIQUE)''')
+        conn.commit()
+        
         # Verifica il numero di partecipanti
         cursor.execute(f"SELECT COUNT(*) FROM {sport.lower()}_event_{event_id}_participants")
         current_participants = cursor.fetchone()[0]
         max_participants = SPORT_LIMITS.get(sport, 0)
         
         if current_participants >= max_participants:
-            messagebox.showwarning("Errore", f"L'evento è pieno! Massimo {max_participants} partecipanti.")
-            return False
+            return False, f"✗ L'evento è pieno! Massimo {max_participants} partecipanti."
         
         # Verifica se l'utente è già iscritto
         cursor.execute(f"SELECT * FROM {sport.lower()}_event_{event_id}_participants WHERE username = ?", (username,))
         if cursor.fetchone():
-            messagebox.showwarning("Errore", "Sei già iscritto a questo evento!")
-            return False
+            return False, "✗ Sei già iscritto a questo evento!"
         
         # Iscrivere l'utente
         cursor.execute(f"INSERT INTO {sport.lower()}_event_{event_id}_participants (username) VALUES (?)", (username,))
         conn.commit()
-        messagebox.showinfo("Successo", f"Sei iscritto a questo evento! Partecipanti: {current_participants + 1}/{max_participants}")
-        return True
+        return True, f"✓ Iscritto con successo! Partecipanti: {current_participants + 1}/{max_participants}"
     except Exception as e:
-        messagebox.showerror("Errore", f"Errore: {str(e)}")
-        return False
+        return False, f"✗ Errore: {str(e)}"
     finally:
         conn.close()
 
 # Funzione per ottenere il numero di partecipanti
-def get_event_participants_count(sport, event_id):
+def get_event_participants_count(event_id):
     conn = sqlite3.connect('sports.db')
     cursor = conn.cursor()
     try:
-        cursor.execute(f"SELECT COUNT(*) FROM {sport.lower()}_event_{event_id}_participants")
-        count = cursor.fetchone()[0]
-    except:
+        # Prima recupera lo sport dall'evento
+        cursor.execute("SELECT sport FROM sport_events WHERE id = ?", (event_id,))
+        result = cursor.fetchone()
+        if result:
+            sport = result[0]
+            cursor.execute(f"SELECT COUNT(*) FROM {sport.lower()}_event_{event_id}_participants")
+            count = cursor.fetchone()[0]
+        else:
+            count = 0
+    except Exception as e:
+        print(f"Errore get_event_participants_count: {e}")
         count = 0
     conn.close()
     return count
@@ -154,11 +169,25 @@ def login_user(entry_name, entry_password):
     else:
         messagebox.showwarning("Errore", "Inserisci nome utente e password.")
 
+# Variabili globali per le finestre
+users_window_instance = None
+events_window_instance = None
+create_event_window_instance = None
+
 # Funzione per aprire la finestra principale
 def open_show_users_window():
+    global users_window_instance
+    
+    # Se la finestra è già aperta, portala in primo piano
+    if users_window_instance and users_window_instance.winfo_exists():
+        users_window_instance.lift()
+        users_window_instance.focus()
+        return
+    
     users_window = tk.Toplevel()
+    users_window_instance = users_window
     users_window.title("Visualizza Utenti")
-    users_window.geometry("600x400")
+    users_window.geometry("600x500")
     users_window.configure(bg="#2e2e2e")
     
     # Titolo
@@ -174,8 +203,12 @@ def open_show_users_window():
     combo_sport_users.pack(pady=10)
     
     # Area per i risultati
-    text_results = tk.Text(users_window, height=15, width=60, bg="#1e1e1e", fg="white", font=("Helvetica", 11))
+    text_results = tk.Text(users_window, height=12, width=60, bg="#1e1e1e", fg="white", font=("Helvetica", 11))
     text_results.pack(pady=10, padx=10)
+    
+    # Area messaggi
+    text_messages = tk.Text(users_window, height=3, width=60, bg="#1e1e1e", fg="#00ff00", font=("Helvetica", 10))
+    text_messages.pack(pady=5, padx=10)
     
     # Funzione per visualizzare gli utenti
     def show_users_from_window():
@@ -190,11 +223,19 @@ def open_show_users_window():
             if users:
                 for user in users:
                     text_results.insert(tk.END, f"{user[1]} (Livello: {user[2]})\n")
+                text_messages.config(fg="#00ff00")
+                text_messages.delete(1.0, tk.END)
+                text_messages.insert(tk.END, f"✓ Utenti caricati: {len(users)}")
             else:
                 text_results.insert(tk.END, f"Nessun utente trovato per {sport}.")
+                text_messages.config(fg="#ffaa00")
+                text_messages.delete(1.0, tk.END)
+                text_messages.insert(tk.END, "Nessun utente per questo sport")
         except Exception as e:
             text_results.delete(1.0, tk.END)
-            text_results.insert(tk.END, f"Errore: {str(e)}")
+            text_messages.config(fg="#ff0000")
+            text_messages.delete(1.0, tk.END)
+            text_messages.insert(tk.END, f"Errore: {str(e)}")
         conn.close()
     
     # Bottone visualizza
@@ -203,14 +244,24 @@ def open_show_users_window():
                               bg="#0d7377", fg="white", font=("Helvetica", 12), 
                               activebackground="#14919b", activeforeground="white", padx=20, pady=10)
     btn_visualize.pack(pady=20)
+    btn_visualize.pack(pady=20)
     
     # Carica gli utenti al primo sport
     show_users_from_window()
 
 def open_show_events_window(username):
+    global events_window_instance
+    
+    # Se la finestra è già aperta, portala in primo piano e aggiorna
+    if events_window_instance and events_window_instance.winfo_exists():
+        events_window_instance.lift()
+        events_window_instance.focus()
+        return
+    
     events_window = tk.Toplevel()
+    events_window_instance = events_window
     events_window.title("Visualizza Eventi")
-    events_window.geometry("650x500")
+    events_window.geometry("650x550")
     events_window.configure(bg="#2e2e2e")
     
     # Titolo
@@ -226,8 +277,18 @@ def open_show_events_window(username):
     combo_sport_events.pack(pady=10)
     
     # Area per i risultati
-    text_results = tk.Text(events_window, height=15, width=70, bg="#1e1e1e", fg="white", font=("Helvetica", 11))
+    text_results = tk.Text(events_window, height=10, width=70, bg="#1e1e1e", fg="white", font=("Helvetica", 11))
     text_results.pack(pady=10, padx=10)
+    
+    # Selezione evento
+    label_select_event = tk.Label(events_window, text="Seleziona Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_select_event.pack(pady=10)
+    combo_events = ttk.Combobox(events_window, state="readonly", font=("Helvetica", 12), width=70)
+    combo_events.pack(pady=10, padx=10)
+    
+    # Area messaggi
+    text_messages = tk.Text(events_window, height=3, width=70, bg="#1e1e1e", fg="#00ff00", font=("Helvetica", 10))
+    text_messages.pack(pady=5, padx=10)
     
     # Lista per tenere traccia degli event ID
     events_list = []
@@ -239,77 +300,107 @@ def open_show_events_window(username):
         conn = sqlite3.connect('sports.db')
         cursor = conn.cursor()
         try:
-            cursor.execute(f"SELECT * FROM {sport.lower()}_events")
+            cursor.execute(f"SELECT * FROM sport_events WHERE sport = '{sport}'")
             events = cursor.fetchall()
             
             text_results.delete(1.0, tk.END)
             events_list = []
-            combo_events.delete(0, tk.END)
+            combo_events['values'] = []
             
             if events:
+                event_list = []
                 for i, event in enumerate(events, start=1):  # Inizia da 1
                     event_id = event[0]
-                    event_name = event[1]
-                    event_date = event[2]
-                    event_location = event[3]
-                    participants = get_event_participants_count(sport, event_id)
+                    event_name = event[2]
+                    event_date = event[3]
+                    participants = get_event_participants_count(event_id)
                     max_participants = SPORT_LIMITS.get(sport, 0)
                     
-                    text_results.insert(tk.END, f"[{i}] Evento: {event_name}\nData: {event_date}\nLuogo: {event_location}\nPartecipanti: {participants}/{max_participants}\n---\n")
+                    text_results.insert(tk.END, f"[{i}] {event_name} - {event_date} ({participants}/{max_participants} partecipanti)\n")
                     events_list.append((event_id, sport))
-                    combo_events['values'] = list(range(1, len(events_list) + 1))
+                    event_list.append(f"{i}. {event_name}")
+                
+                combo_events['values'] = event_list
+                text_messages.config(fg="#00ff00")
+                text_messages.delete(1.0, tk.END)
+                text_messages.insert(tk.END, f"✓ {len(events)} eventi trovati")
             else:
                 text_results.insert(tk.END, f"Nessun evento trovato per {sport}.")
-                combo_events['values'] = []
+                text_messages.config(fg="#ffaa00")
+                text_messages.delete(1.0, tk.END)
+                text_messages.insert(tk.END, "Nessun evento disponibile")
         except Exception as e:
             text_results.delete(1.0, tk.END)
-            text_results.insert(tk.END, f"Nessun evento trovato per {sport}.")
-            combo_events['values'] = []
+            text_results.insert(tk.END, f"Errore: {str(e)}")
+            text_messages.config(fg="#ff0000")
+            text_messages.delete(1.0, tk.END)
+            text_messages.insert(tk.END, f"Errore: {str(e)}")
         conn.close()
     
-    # Bottone visualizza
-    btn_visualize = tk.Button(events_window, text="Visualizza", 
+    # Funzione per iscriversi all'evento
+    def subscribe_to_event():
+        try:
+            if not combo_events.get():
+                text_messages.config(fg="#ff0000")
+                text_messages.delete(1.0, tk.END)
+                text_messages.insert(tk.END, "✗ Seleziona un evento")
+                return
+            
+            event_num = int(combo_events.get().split(".")[0])
+            if event_num < 1 or event_num > len(events_list):
+                text_messages.config(fg="#ff0000")
+                text_messages.delete(1.0, tk.END)
+                text_messages.insert(tk.END, "✗ Numero evento non valido!")
+                return
+            
+            event_id, sport = events_list[event_num - 1]
+            success, message = register_to_event(sport, event_id, username)
+            
+            if success:
+                text_messages.config(fg="#00ff00")
+                show_events_from_window()  # Ricarica gli eventi
+                combo_events.set('')
+            else:
+                text_messages.config(fg="#ff0000")
+            
+            text_messages.delete(1.0, tk.END)
+            text_messages.insert(tk.END, message)
+        except (ValueError, IndexError) as e:
+            text_messages.config(fg="#ff0000")
+            text_messages.delete(1.0, tk.END)
+            text_messages.insert(tk.END, f"✗ Errore: {str(e)}")
+    
+    # Bottoni
+    button_frame = tk.Frame(events_window, bg="#2e2e2e")
+    button_frame.pack(pady=20)
+    
+    btn_visualize = tk.Button(button_frame, text="Visualizza", 
                               command=show_events_from_window,
                               bg="#0d7377", fg="white", font=("Helvetica", 12), 
                               activebackground="#14919b", activeforeground="white", padx=20, pady=10)
-    btn_visualize.pack(pady=10)
+    btn_visualize.pack(side=tk.LEFT, padx=10)
     
-    # Frame per i pulsanti di iscrisione
-    frame_subscribe = tk.Frame(events_window, bg="#2e2e2e")
-    frame_subscribe.pack(pady=10)
-    
-    label_event_num = tk.Label(frame_subscribe, text="Seleziona evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 10))
-    label_event_num.pack(side=tk.LEFT, padx=5)
-    
-    combo_events = ttk.Combobox(frame_subscribe, state="readonly", font=("Helvetica", 10), width=5)
-    combo_events.pack(side=tk.LEFT, padx=5)
-    
-    def subscribe_to_event():
-        try:
-            event_index = int(entry_event_num.get())
-            if event_index < 0 or event_index >= len(events_list):
-                messagebox.showwarning("Errore", "Numero evento non valido!")
-                return
-            
-            event_id, sport = events_list[event_index]
-            register_to_event(sport, event_id, username)
-            show_events_from_window()  # Ricarica gli eventi
-            entry_event_num.delete(0, tk.END)
-        except ValueError:
-            messagebox.showwarning("Errore", "Inserisci un numero valido!")
-    
-    btn_subscribe = tk.Button(frame_subscribe, text="Iscriviti", command=subscribe_to_event,
-                             bg="#14919b", fg="white", font=("Helvetica", 10), 
-                             activebackground="#0d7377", activeforeground="white", padx=15, pady=5)
-    btn_subscribe.pack(side=tk.LEFT, padx=5)
+    btn_subscribe = tk.Button(button_frame, text="Iscriviti", command=subscribe_to_event,
+                             bg="#14919b", fg="white", font=("Helvetica", 12), 
+                             activebackground="#0d7377", activeforeground="white", padx=20, pady=10)
+    btn_subscribe.pack(side=tk.LEFT, padx=10)
     
     # Carica gli eventi al primo sport
     show_events_from_window()
 
 def open_create_event_window(sport_selected):
+    global create_event_window_instance
+    
+    # Se la finestra è già aperta, portala in primo piano
+    if create_event_window_instance and create_event_window_instance.winfo_exists():
+        create_event_window_instance.lift()
+        create_event_window_instance.focus()
+        return
+    
     create_window = tk.Toplevel()
+    create_event_window_instance = create_window
     create_window.title("Crea Evento")
-    create_window.geometry("500x400")
+    create_window.geometry("500x450")
     create_window.configure(bg="#2e2e2e")
     
     # Titolo
@@ -342,6 +433,10 @@ def open_create_event_window(sport_selected):
     entry_event_location = tk.Entry(create_window, font=("Helvetica", 12), width=30)
     entry_event_location.pack(pady=5)
     
+    # Area messaggi
+    text_messages = tk.Text(create_window, height=3, width=50, bg="#1e1e1e", fg="#00ff00", font=("Helvetica", 10))
+    text_messages.pack(pady=10, padx=10)
+    
     # Bottone crea
     def create_event_from_window():
         event_name = entry_event_name.get()
@@ -350,38 +445,49 @@ def open_create_event_window(sport_selected):
         sport = combo_sport_create.get()
         
         if event_name and event_date and event_location:
-            conn = sqlite3.connect('sports.db')
-            cursor = conn.cursor()
-            
-            cursor.execute(f'''
-            CREATE TABLE IF NOT EXISTS {sport.lower()}_events (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                event_name TEXT NOT NULL,
-                event_date TEXT NOT NULL,
-                event_location TEXT NOT NULL
-            )
-            ''')
-            
-            cursor.execute(f"INSERT INTO {sport.lower()}_events (event_name, event_date, event_location) VALUES (?, ?, ?)", 
-                           (event_name, event_date, event_location))
-            
-            conn.commit()
-            
-            # Ottieni l'ID dell'evento appena creato
-            cursor.execute(f"SELECT last_insert_rowid()")
-            event_id = cursor.fetchone()[0]
-            
-            conn.close()
-            
-            # Crea la tabella dei partecipanti per questo evento
-            create_event_participants_table(sport, event_id)
-            
-            messagebox.showinfo("Successo", f"Evento '{event_name}' creato con successo!")
-            entry_event_name.delete(0, tk.END)
-            entry_event_date.delete(0, tk.END)
-            entry_event_location.delete(0, tk.END)
+            try:
+                conn = sqlite3.connect('sports.db')
+                cursor = conn.cursor()
+                
+                # Crea nella tabella centrale sport_events
+                cursor.execute('''
+                CREATE TABLE IF NOT EXISTS sport_events (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    sport TEXT NOT NULL,
+                    event_name TEXT NOT NULL,
+                    event_date TEXT NOT NULL,
+                    event_location TEXT NOT NULL
+                )
+                ''')
+                
+                cursor.execute("INSERT INTO sport_events (sport, event_name, event_date, event_location) VALUES (?, ?, ?, ?)", 
+                               (sport, event_name, event_date, event_location))
+                
+                conn.commit()
+                
+                # Ottieni l'ID dell'evento appena creato
+                cursor.execute("SELECT last_insert_rowid()")
+                event_id = cursor.fetchone()[0]
+                
+                conn.close()
+                
+                # Crea la tabella dei partecipanti per questo evento
+                create_event_participants_table(sport, event_id)
+                
+                text_messages.config(fg="#00ff00")
+                text_messages.delete(1.0, tk.END)
+                text_messages.insert(tk.END, f"✓ Evento '{event_name}' creato con successo!")
+                entry_event_name.delete(0, tk.END)
+                entry_event_date.delete(0, tk.END)
+                entry_event_location.delete(0, tk.END)
+            except Exception as e:
+                text_messages.config(fg="#ff0000")
+                text_messages.delete(1.0, tk.END)
+                text_messages.insert(tk.END, f"✗ Errore: {str(e)}")
         else:
-            messagebox.showwarning("Errore", "Compila tutti i campi!")
+            text_messages.config(fg="#ff0000")
+            text_messages.delete(1.0, tk.END)
+            text_messages.insert(tk.END, "✗ Compila tutti i campi!")
     
     btn_create = tk.Button(create_window, text="Crea Evento", command=create_event_from_window,
                           bg="#0d7377", fg="white", font=("Helvetica", 12), 
