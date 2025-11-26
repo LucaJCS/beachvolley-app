@@ -3,6 +3,12 @@ from tkinter import messagebox
 from tkinter import ttk  # Importa ttk per uno stile più moderno
 import sqlite3
 
+# Importa il modulo per la generazione dei report
+try:
+    from generate_reports import generate_pdf_report
+except ImportError:
+    generate_pdf_report = None
+
 # Creazione della tabella 'users' se non esiste già
 def create_users_table():
     conn = sqlite3.connect('sports.db')
@@ -46,6 +52,13 @@ def create_event_participants_table(sport, event_id):
         cursor.execute(f'''CREATE TABLE IF NOT EXISTS {sport.lower()}_event_{event_id}_participants (
                             id INTEGER PRIMARY KEY AUTOINCREMENT,
                             username TEXT NOT NULL UNIQUE)''')
+        
+        # Crea tabella commenti per l'evento
+        cursor.execute(f'''CREATE TABLE IF NOT EXISTS {sport.lower()}_event_{event_id}_comments (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            username TEXT NOT NULL,
+                            comment TEXT NOT NULL,
+                            timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
         conn.commit()
     except Exception as e:
         print(f"Errore creazione tabella: {e}")
@@ -187,7 +200,7 @@ def open_show_users_window():
     users_window = tk.Toplevel()
     users_window_instance = users_window
     users_window.title("Visualizza Utenti")
-    users_window.geometry("600x500")
+    users_window.geometry("800x700")
     users_window.configure(bg="#2e2e2e")
     
     # Titolo
@@ -261,7 +274,7 @@ def open_show_events_window(username):
     events_window = tk.Toplevel()
     events_window_instance = events_window
     events_window.title("Visualizza Eventi")
-    events_window.geometry("650x550")
+    events_window.geometry("1200x900")
     events_window.configure(bg="#2e2e2e")
     
     # Titolo
@@ -287,11 +300,109 @@ def open_show_events_window(username):
     combo_events.pack(pady=10, padx=10)
     
     # Area messaggi
-    text_messages = tk.Text(events_window, height=3, width=70, bg="#1e1e1e", fg="#00ff00", font=("Helvetica", 10))
+    text_messages = tk.Text(events_window, height=2, width=70, bg="#1e1e1e", fg="#00ff00", font=("Helvetica", 10))
     text_messages.pack(pady=5, padx=10)
+    
+    # Frame per descrizione e commenti
+    frame_details = tk.Frame(events_window, bg="#2e2e2e")
+    frame_details.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+    
+    # Sinistra: Descrizione evento
+    frame_left = tk.Frame(frame_details, bg="#2e2e2e")
+    frame_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+    
+    label_description = tk.Label(frame_left, text="Descrizione Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 11, "bold"))
+    label_description.pack(pady=5)
+    text_description = tk.Text(frame_left, height=15, width=40, bg="#1e1e1e", fg="white", font=("Helvetica", 10))
+    text_description.pack(pady=5, fill=tk.BOTH, expand=True)
+    
+    # Destra: Commenti
+    frame_right = tk.Frame(frame_details, bg="#2e2e2e")
+    frame_right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5)
+    
+    label_comments = tk.Label(frame_right, text="Commenti:", bg="#2e2e2e", fg="white", font=("Helvetica", 11, "bold"))
+    label_comments.pack(pady=5)
+    text_comments = tk.Text(frame_right, height=12, width=40, bg="#1e1e1e", fg="#88ff88", font=("Helvetica", 9))
+    text_comments.pack(pady=5, fill=tk.BOTH, expand=True)
+    
+    # Frame per inserire commenti
+    frame_new_comment = tk.Frame(frame_right, bg="#2e2e2e")
+    frame_new_comment.pack(pady=5, fill=tk.X)
+    
+    label_new_comment = tk.Label(frame_new_comment, text="Nuovo commento:", bg="#2e2e2e", fg="white", font=("Helvetica", 9))
+    label_new_comment.pack(side=tk.LEFT, padx=5)
+    
+    entry_new_comment = tk.Entry(frame_new_comment, font=("Helvetica", 9), width=25)
+    entry_new_comment.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
+    
+    btn_add_comment = tk.Button(frame_new_comment, text="Invia", 
+                               command=add_comment,
+                               bg="#0d7377", fg="white", font=("Helvetica", 9), 
+                               activebackground="#14919b", activeforeground="white")
+    btn_add_comment.pack(side=tk.LEFT, padx=5)
     
     # Lista per tenere traccia degli event ID
     events_list = []
+    current_event_id = None
+    current_sport = None
+    
+    # Funzione per caricare i commenti di un evento
+    def load_event_details():
+        nonlocal current_event_id, current_sport
+        
+        if not combo_events.get():
+            text_description.config(state=tk.NORMAL)
+            text_description.delete(1.0, tk.END)
+            text_description.insert(tk.END, "Seleziona un evento per visualizzare i dettagli")
+            text_description.config(state=tk.DISABLED)
+            text_comments.config(state=tk.NORMAL)
+            text_comments.delete(1.0, tk.END)
+            text_comments.config(state=tk.DISABLED)
+            return
+        
+        event_num = int(combo_events.get().split(".")[0])
+        if event_num < 1 or event_num > len(events_list):
+            return
+        
+        event_id, sport = events_list[event_num - 1]
+        current_event_id = event_id
+        current_sport = sport
+        
+        conn = sqlite3.connect('sports.db')
+        cursor = conn.cursor()
+        try:
+            # Carica descrizione evento
+            cursor.execute("SELECT description FROM sport_events WHERE id = ?", (event_id,))
+            result = cursor.fetchone()
+            description = result[0] if result and result[0] else "Nessuna descrizione disponibile"
+            
+            text_description.config(state=tk.NORMAL)
+            text_description.delete(1.0, tk.END)
+            text_description.insert(tk.END, description)
+            text_description.config(state=tk.DISABLED)
+            
+            # Carica commenti
+            cursor.execute(f"SELECT username, comment FROM {sport.lower()}_event_{event_id}_comments ORDER BY timestamp DESC")
+            comments = cursor.fetchall()
+            
+            text_comments.config(state=tk.NORMAL)
+            text_comments.delete(1.0, tk.END)
+            if comments:
+                for username, comment in comments:
+                    text_comments.insert(tk.END, f"{username}: {comment}\n\n")
+            else:
+                text_comments.insert(tk.END, "Nessun commento ancora. Sii il primo a commentare!")
+            text_comments.config(state=tk.DISABLED)
+        except Exception as e:
+            text_description.config(state=tk.NORMAL)
+            text_description.delete(1.0, tk.END)
+            text_description.insert(tk.END, f"Errore nel caricamento: {str(e)}")
+            text_description.config(state=tk.DISABLED)
+        finally:
+            conn.close()
+    
+    # Aggiorna combo_events con il comando di caricamento dettagli
+    combo_events.bind("<<ComboboxSelected>>", lambda e: load_event_details())
     
     # Funzione per visualizzare gli eventi
     def show_events_from_window():
@@ -370,6 +481,48 @@ def open_show_events_window(username):
             text_messages.delete(1.0, tk.END)
             text_messages.insert(tk.END, f"✗ Errore: {str(e)}")
     
+    # Funzione per aggiungere commento
+    def add_comment():
+        comment_text = entry_new_comment.get().strip()
+        
+        if not comment_text:
+            text_messages.config(fg="#ff0000")
+            text_messages.delete(1.0, tk.END)
+            text_messages.insert(tk.END, "✗ Inserisci un commento")
+            return
+        
+        if not current_event_id or not current_sport:
+            text_messages.config(fg="#ff0000")
+            text_messages.delete(1.0, tk.END)
+            text_messages.insert(tk.END, "✗ Seleziona un evento prima")
+            return
+        
+        conn = sqlite3.connect('sports.db')
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f'''CREATE TABLE IF NOT EXISTS {current_sport.lower()}_event_{current_event_id}_comments (
+                                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                                username TEXT NOT NULL,
+                                comment TEXT NOT NULL,
+                                timestamp DATETIME DEFAULT CURRENT_TIMESTAMP)''')
+            
+            cursor.execute(f"INSERT INTO {current_sport.lower()}_event_{current_event_id}_comments (username, comment) VALUES (?, ?)",
+                          (username, comment_text))
+            conn.commit()
+            
+            entry_new_comment.delete(0, tk.END)
+            load_event_details()  # Ricarica i commenti
+            
+            text_messages.config(fg="#00ff00")
+            text_messages.delete(1.0, tk.END)
+            text_messages.insert(tk.END, "✓ Commento aggiunto con successo!")
+        except Exception as e:
+            text_messages.config(fg="#ff0000")
+            text_messages.delete(1.0, tk.END)
+            text_messages.insert(tk.END, f"✗ Errore: {str(e)}")
+        finally:
+            conn.close()
+    
     # Bottoni
     button_frame = tk.Frame(events_window, bg="#2e2e2e")
     button_frame.pack(pady=20)
@@ -400,7 +553,7 @@ def open_create_event_window(sport_selected):
     create_window = tk.Toplevel()
     create_event_window_instance = create_window
     create_window.title("Crea Evento")
-    create_window.geometry("500x450")
+    create_window.geometry("700x600")
     create_window.configure(bg="#2e2e2e")
     
     # Titolo
@@ -433,6 +586,12 @@ def open_create_event_window(sport_selected):
     entry_event_location = tk.Entry(create_window, font=("Helvetica", 12), width=30)
     entry_event_location.pack(pady=5)
     
+    # Descrizione evento
+    label_event_description = tk.Label(create_window, text="Descrizione Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_event_description.pack(pady=5)
+    text_event_description = tk.Text(create_window, height=4, width=35, bg="#1e1e1e", fg="white", font=("Helvetica", 10))
+    text_event_description.pack(pady=5)
+    
     # Area messaggi
     text_messages = tk.Text(create_window, height=3, width=50, bg="#1e1e1e", fg="#00ff00", font=("Helvetica", 10))
     text_messages.pack(pady=10, padx=10)
@@ -442,6 +601,7 @@ def open_create_event_window(sport_selected):
         event_name = entry_event_name.get()
         event_date = entry_event_date.get()
         event_location = entry_event_location.get()
+        event_description = text_event_description.get(1.0, tk.END).strip()
         sport = combo_sport_create.get()
         
         if event_name and event_date and event_location:
@@ -456,12 +616,19 @@ def open_create_event_window(sport_selected):
                     sport TEXT NOT NULL,
                     event_name TEXT NOT NULL,
                     event_date TEXT NOT NULL,
-                    event_location TEXT NOT NULL
+                    event_location TEXT NOT NULL,
+                    description TEXT DEFAULT ''
                 )
                 ''')
                 
-                cursor.execute("INSERT INTO sport_events (sport, event_name, event_date, event_location) VALUES (?, ?, ?, ?)", 
-                               (sport, event_name, event_date, event_location))
+                # Aggiungi colonna descrizione se non esiste (retrocompatibilità)
+                try:
+                    cursor.execute("ALTER TABLE sport_events ADD COLUMN description TEXT DEFAULT ''")
+                except sqlite3.OperationalError:
+                    pass
+                
+                cursor.execute("INSERT INTO sport_events (sport, event_name, event_date, event_location, description) VALUES (?, ?, ?, ?, ?)", 
+                               (sport, event_name, event_date, event_location, event_description))
                 
                 conn.commit()
                 
@@ -500,7 +667,7 @@ def open_main_window(name):
     # Crea la finestra principale
     root = tk.Tk()
     root.title("Gestione Eventi Sportivi")
-    root.geometry("600x500")
+    root.geometry("800x700")
     root.configure(bg="#2e2e2e")
 
     style = ttk.Style()
@@ -542,6 +709,22 @@ def open_main_window(name):
                                 bg="#0d7377", fg="white", font=("Helvetica", 12), 
                                 activebackground="#14919b", activeforeground="white", padx=30, pady=15, width=25)
     btn_create_event.pack(pady=10)
+    
+    # Bottone per generare report
+    def generate_report():
+        if generate_pdf_report:
+            try:
+                generate_pdf_report('report_sportivi.pdf')
+                messagebox.showinfo("Successo", "Report PDF generato: report_sportivi.pdf")
+            except Exception as e:
+                messagebox.showerror("Errore", f"Errore nella generazione del report: {str(e)}")
+        else:
+            messagebox.showwarning("Attenzione", "Il modulo generate_reports non è disponibile.")
+    
+    btn_report = tk.Button(root, text="Genera Report PDF", command=generate_report,
+                          bg="#ff6b6b", fg="white", font=("Helvetica", 12), 
+                          activebackground="#ff5252", activeforeground="white", padx=30, pady=15, width=25)
+    btn_report.pack(pady=10)
 
     root.mainloop()
 
