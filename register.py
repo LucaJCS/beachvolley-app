@@ -25,6 +25,71 @@ def create_users_table():
 # Chiama la funzione per creare la tabella users all'inizio del programma
 create_users_table()
 
+# Dizionario con i limiti di partecipanti per sport
+SPORT_LIMITS = {
+    "BeachVolley": 8,
+    "Tennis": 2,
+    "Calcetto": 10,
+    "Padel": 4
+}
+
+# Funzione per creare tabella partecipanti per un evento
+def create_event_participants_table(sport, event_id):
+    conn = sqlite3.connect('sports.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f'''CREATE TABLE IF NOT EXISTS {sport.lower()}_event_{event_id}_participants (
+                            id INTEGER PRIMARY KEY AUTOINCREMENT,
+                            username TEXT NOT NULL UNIQUE)''')
+        conn.commit()
+    except Exception as e:
+        print(f"Errore creazione tabella: {e}")
+    conn.close()
+
+# Funzione per iscrivere un utente a un evento
+def register_to_event(sport, event_id, username):
+    conn = sqlite3.connect('sports.db')
+    cursor = conn.cursor()
+    
+    try:
+        # Verifica il numero di partecipanti
+        cursor.execute(f"SELECT COUNT(*) FROM {sport.lower()}_event_{event_id}_participants")
+        current_participants = cursor.fetchone()[0]
+        max_participants = SPORT_LIMITS.get(sport, 0)
+        
+        if current_participants >= max_participants:
+            messagebox.showwarning("Errore", f"L'evento è pieno! Massimo {max_participants} partecipanti.")
+            return False
+        
+        # Verifica se l'utente è già iscritto
+        cursor.execute(f"SELECT * FROM {sport.lower()}_event_{event_id}_participants WHERE username = ?", (username,))
+        if cursor.fetchone():
+            messagebox.showwarning("Errore", "Sei già iscritto a questo evento!")
+            return False
+        
+        # Iscrivere l'utente
+        cursor.execute(f"INSERT INTO {sport.lower()}_event_{event_id}_participants (username) VALUES (?)", (username,))
+        conn.commit()
+        messagebox.showinfo("Successo", f"Sei iscritto a questo evento! Partecipanti: {current_participants + 1}/{max_participants}")
+        return True
+    except Exception as e:
+        messagebox.showerror("Errore", f"Errore: {str(e)}")
+        return False
+    finally:
+        conn.close()
+
+# Funzione per ottenere il numero di partecipanti
+def get_event_participants_count(sport, event_id):
+    conn = sqlite3.connect('sports.db')
+    cursor = conn.cursor()
+    try:
+        cursor.execute(f"SELECT COUNT(*) FROM {sport.lower()}_event_{event_id}_participants")
+        count = cursor.fetchone()[0]
+    except:
+        count = 0
+    conn.close()
+    return count
+
 # Funzione per registrare l'utente
 def register_user(combo_level, combo_sport, entry_name, entry_password):
     name = entry_name.get()
@@ -90,13 +155,246 @@ def login_user(entry_name, entry_password):
         messagebox.showwarning("Errore", "Inserisci nome utente e password.")
 
 # Funzione per aprire la finestra principale
+def open_show_users_window():
+    users_window = tk.Toplevel()
+    users_window.title("Visualizza Utenti")
+    users_window.geometry("600x400")
+    users_window.configure(bg="#2e2e2e")
+    
+    # Titolo
+    label_title = tk.Label(users_window, text="Visualizza Utenti", bg="#2e2e2e", fg="white", font=("Helvetica", 14, "bold"))
+    label_title.pack(pady=20)
+    
+    # Sport preferito
+    label_sport = tk.Label(users_window, text="Seleziona Sport:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_sport.pack(pady=10)
+    combo_sport_users = ttk.Combobox(users_window, state="readonly", font=("Helvetica", 12), width=30)
+    combo_sport_users['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
+    combo_sport_users.set("BeachVolley")
+    combo_sport_users.pack(pady=10)
+    
+    # Area per i risultati
+    text_results = tk.Text(users_window, height=15, width=60, bg="#1e1e1e", fg="white", font=("Helvetica", 11))
+    text_results.pack(pady=10, padx=10)
+    
+    # Funzione per visualizzare gli utenti
+    def show_users_from_window():
+        sport = combo_sport_users.get()
+        conn = sqlite3.connect('sports.db')
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"SELECT * FROM {sport.lower()}")
+            users = cursor.fetchall()
+            
+            text_results.delete(1.0, tk.END)
+            if users:
+                for user in users:
+                    text_results.insert(tk.END, f"{user[1]} (Livello: {user[2]})\n")
+            else:
+                text_results.insert(tk.END, f"Nessun utente trovato per {sport}.")
+        except Exception as e:
+            text_results.delete(1.0, tk.END)
+            text_results.insert(tk.END, f"Errore: {str(e)}")
+        conn.close()
+    
+    # Bottone visualizza
+    btn_visualize = tk.Button(users_window, text="Visualizza", 
+                              command=show_users_from_window,
+                              bg="#0d7377", fg="white", font=("Helvetica", 12), 
+                              activebackground="#14919b", activeforeground="white", padx=20, pady=10)
+    btn_visualize.pack(pady=20)
+    
+    # Carica gli utenti al primo sport
+    show_users_from_window()
+
+def open_show_events_window(username):
+    events_window = tk.Toplevel()
+    events_window.title("Visualizza Eventi")
+    events_window.geometry("650x500")
+    events_window.configure(bg="#2e2e2e")
+    
+    # Titolo
+    label_title = tk.Label(events_window, text="Visualizza Eventi", bg="#2e2e2e", fg="white", font=("Helvetica", 14, "bold"))
+    label_title.pack(pady=20)
+    
+    # Sport preferito
+    label_sport = tk.Label(events_window, text="Seleziona Sport:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_sport.pack(pady=10)
+    combo_sport_events = ttk.Combobox(events_window, state="readonly", font=("Helvetica", 12), width=30)
+    combo_sport_events['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
+    combo_sport_events.set("BeachVolley")
+    combo_sport_events.pack(pady=10)
+    
+    # Area per i risultati
+    text_results = tk.Text(events_window, height=15, width=70, bg="#1e1e1e", fg="white", font=("Helvetica", 11))
+    text_results.pack(pady=10, padx=10)
+    
+    # Lista per tenere traccia degli event ID
+    events_list = []
+    
+    # Funzione per visualizzare gli eventi
+    def show_events_from_window():
+        nonlocal events_list
+        sport = combo_sport_events.get()
+        conn = sqlite3.connect('sports.db')
+        cursor = conn.cursor()
+        try:
+            cursor.execute(f"SELECT * FROM {sport.lower()}_events")
+            events = cursor.fetchall()
+            
+            text_results.delete(1.0, tk.END)
+            events_list = []
+            combo_events.delete(0, tk.END)
+            
+            if events:
+                for i, event in enumerate(events, start=1):  # Inizia da 1
+                    event_id = event[0]
+                    event_name = event[1]
+                    event_date = event[2]
+                    event_location = event[3]
+                    participants = get_event_participants_count(sport, event_id)
+                    max_participants = SPORT_LIMITS.get(sport, 0)
+                    
+                    text_results.insert(tk.END, f"[{i}] Evento: {event_name}\nData: {event_date}\nLuogo: {event_location}\nPartecipanti: {participants}/{max_participants}\n---\n")
+                    events_list.append((event_id, sport))
+                    combo_events['values'] = list(range(1, len(events_list) + 1))
+            else:
+                text_results.insert(tk.END, f"Nessun evento trovato per {sport}.")
+                combo_events['values'] = []
+        except Exception as e:
+            text_results.delete(1.0, tk.END)
+            text_results.insert(tk.END, f"Nessun evento trovato per {sport}.")
+            combo_events['values'] = []
+        conn.close()
+    
+    # Bottone visualizza
+    btn_visualize = tk.Button(events_window, text="Visualizza", 
+                              command=show_events_from_window,
+                              bg="#0d7377", fg="white", font=("Helvetica", 12), 
+                              activebackground="#14919b", activeforeground="white", padx=20, pady=10)
+    btn_visualize.pack(pady=10)
+    
+    # Frame per i pulsanti di iscrisione
+    frame_subscribe = tk.Frame(events_window, bg="#2e2e2e")
+    frame_subscribe.pack(pady=10)
+    
+    label_event_num = tk.Label(frame_subscribe, text="Seleziona evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 10))
+    label_event_num.pack(side=tk.LEFT, padx=5)
+    
+    combo_events = ttk.Combobox(frame_subscribe, state="readonly", font=("Helvetica", 10), width=5)
+    combo_events.pack(side=tk.LEFT, padx=5)
+    
+    def subscribe_to_event():
+        try:
+            event_index = int(entry_event_num.get())
+            if event_index < 0 or event_index >= len(events_list):
+                messagebox.showwarning("Errore", "Numero evento non valido!")
+                return
+            
+            event_id, sport = events_list[event_index]
+            register_to_event(sport, event_id, username)
+            show_events_from_window()  # Ricarica gli eventi
+            entry_event_num.delete(0, tk.END)
+        except ValueError:
+            messagebox.showwarning("Errore", "Inserisci un numero valido!")
+    
+    btn_subscribe = tk.Button(frame_subscribe, text="Iscriviti", command=subscribe_to_event,
+                             bg="#14919b", fg="white", font=("Helvetica", 10), 
+                             activebackground="#0d7377", activeforeground="white", padx=15, pady=5)
+    btn_subscribe.pack(side=tk.LEFT, padx=5)
+    
+    # Carica gli eventi al primo sport
+    show_events_from_window()
+
+def open_create_event_window(sport_selected):
+    create_window = tk.Toplevel()
+    create_window.title("Crea Evento")
+    create_window.geometry("500x400")
+    create_window.configure(bg="#2e2e2e")
+    
+    # Titolo
+    label_title = tk.Label(create_window, text="Crea Nuovo Evento", bg="#2e2e2e", fg="white", font=("Helvetica", 14, "bold"))
+    label_title.pack(pady=20)
+    
+    # Sport
+    label_sport = tk.Label(create_window, text="Sport:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_sport.pack(pady=10)
+    combo_sport_create = ttk.Combobox(create_window, state="readonly", font=("Helvetica", 12), width=30)
+    combo_sport_create['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
+    combo_sport_create.set(sport_selected)
+    combo_sport_create.pack(pady=10)
+    
+    # Nome evento
+    label_event_name = tk.Label(create_window, text="Nome Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_event_name.pack(pady=5)
+    entry_event_name = tk.Entry(create_window, font=("Helvetica", 12), width=30)
+    entry_event_name.pack(pady=5)
+    
+    # Data evento
+    label_event_date = tk.Label(create_window, text="Data Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_event_date.pack(pady=5)
+    entry_event_date = tk.Entry(create_window, font=("Helvetica", 12), width=30)
+    entry_event_date.pack(pady=5)
+    
+    # Luogo evento
+    label_event_location = tk.Label(create_window, text="Luogo Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_event_location.pack(pady=5)
+    entry_event_location = tk.Entry(create_window, font=("Helvetica", 12), width=30)
+    entry_event_location.pack(pady=5)
+    
+    # Bottone crea
+    def create_event_from_window():
+        event_name = entry_event_name.get()
+        event_date = entry_event_date.get()
+        event_location = entry_event_location.get()
+        sport = combo_sport_create.get()
+        
+        if event_name and event_date and event_location:
+            conn = sqlite3.connect('sports.db')
+            cursor = conn.cursor()
+            
+            cursor.execute(f'''
+            CREATE TABLE IF NOT EXISTS {sport.lower()}_events (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                event_name TEXT NOT NULL,
+                event_date TEXT NOT NULL,
+                event_location TEXT NOT NULL
+            )
+            ''')
+            
+            cursor.execute(f"INSERT INTO {sport.lower()}_events (event_name, event_date, event_location) VALUES (?, ?, ?)", 
+                           (event_name, event_date, event_location))
+            
+            conn.commit()
+            
+            # Ottieni l'ID dell'evento appena creato
+            cursor.execute(f"SELECT last_insert_rowid()")
+            event_id = cursor.fetchone()[0]
+            
+            conn.close()
+            
+            # Crea la tabella dei partecipanti per questo evento
+            create_event_participants_table(sport, event_id)
+            
+            messagebox.showinfo("Successo", f"Evento '{event_name}' creato con successo!")
+            entry_event_name.delete(0, tk.END)
+            entry_event_date.delete(0, tk.END)
+            entry_event_location.delete(0, tk.END)
+        else:
+            messagebox.showwarning("Errore", "Compila tutti i campi!")
+    
+    btn_create = tk.Button(create_window, text="Crea Evento", command=create_event_from_window,
+                          bg="#0d7377", fg="white", font=("Helvetica", 12), 
+                          activebackground="#14919b", activeforeground="white", padx=20, pady=10)
+    btn_create.pack(pady=20)
+
 def open_main_window(name):
-    global combo_sport, entry_event_name, entry_event_date, entry_event_location
+    global combo_sport
     
     # Crea la finestra principale
     root = tk.Tk()
     root.title("Gestione Eventi Sportivi")
-    root.geometry("500x500")
+    root.geometry("600x500")
     root.configure(bg="#2e2e2e")
 
     style = ttk.Style()
@@ -108,42 +406,36 @@ def open_main_window(name):
     style.configure("TCombobox", font=("Helvetica", 12), padding=10)
 
     # Titolo benvenuto
-    label_welcome = ttk.Label(root, text=f"Benvenuto, {name}!")
-    label_welcome.grid(row=0, column=0, columnspan=2, pady=10, padx=10)
+    label_welcome = ttk.Label(root, text=f"Benvenuto, {name}!", font=("Helvetica", 16, "bold"))
+    label_welcome.pack(pady=30)
 
-    # Sport preferito
-    label_sport = ttk.Label(root, text="Sport:")
-    label_sport.grid(row=1, column=0, pady=10, padx=10, sticky="e")
-    combo_sport = ttk.Combobox(root, state="readonly")
+    # Sport preferito per le azioni
+    label_sport = ttk.Label(root, text="Seleziona lo sport:")
+    label_sport.pack(pady=10)
+    combo_sport = ttk.Combobox(root, state="readonly", font=("Helvetica", 12), width=30)
     combo_sport.set("BeachVolley")
     combo_sport['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
-    combo_sport.grid(row=1, column=1, pady=10, padx=10)
+    combo_sport.pack(pady=10)
 
-    # Visualizza Utenti e Eventi
-    btn_show_users = ttk.Button(root, text="Visualizza Utenti", command=show_users)
-    btn_show_users.grid(row=2, column=0, columnspan=2, pady=10)
+    # Separator
+    label_separator = ttk.Label(root, text="Cosa vuoi fare?", font=("Helvetica", 12, "bold"))
+    label_separator.pack(pady=20)
 
-    btn_show_events = ttk.Button(root, text="Visualizza Eventi", command=show_events)
-    btn_show_events.grid(row=3, column=0, columnspan=2, pady=10)
+    # Pulsanti principali
+    btn_show_users = tk.Button(root, text="Visualizza Utenti", command=open_show_users_window,
+                              bg="#0d7377", fg="white", font=("Helvetica", 12), 
+                              activebackground="#14919b", activeforeground="white", padx=30, pady=15, width=25)
+    btn_show_users.pack(pady=10)
 
-    # Creazione Evento
-    label_event_name = ttk.Label(root, text="Nome Evento:")
-    label_event_name.grid(row=4, column=0, pady=10, padx=10, sticky="e")
-    entry_event_name = ttk.Entry(root, style="TEntry")
-    entry_event_name.grid(row=4, column=1, pady=10, padx=10)
+    btn_show_events = tk.Button(root, text="Visualizza Eventi", command=lambda: open_show_events_window(name),
+                               bg="#0d7377", fg="white", font=("Helvetica", 12), 
+                               activebackground="#14919b", activeforeground="white", padx=30, pady=15, width=25)
+    btn_show_events.pack(pady=10)
 
-    label_event_date = ttk.Label(root, text="Data Evento:")
-    label_event_date.grid(row=5, column=0, pady=10, padx=10, sticky="e")
-    entry_event_date = ttk.Entry(root, style="TEntry")
-    entry_event_date.grid(row=5, column=1, pady=10, padx=10)
-
-    label_event_location = ttk.Label(root, text="Luogo Evento:")
-    label_event_location.grid(row=6, column=0, pady=10, padx=10, sticky="e")
-    entry_event_location = ttk.Entry(root, style="TEntry")
-    entry_event_location.grid(row=6, column=1, pady=10, padx=10)
-
-    btn_create_event = ttk.Button(root, text="Crea Evento", command=create_event)
-    btn_create_event.grid(row=7, column=0, columnspan=2, pady=10)
+    btn_create_event = tk.Button(root, text="Crea Evento", command=lambda: open_create_event_window(combo_sport.get()),
+                                bg="#0d7377", fg="white", font=("Helvetica", 12), 
+                                activebackground="#14919b", activeforeground="white", padx=30, pady=15, width=25)
+    btn_create_event.pack(pady=10)
 
     root.mainloop()
 
@@ -169,68 +461,55 @@ def show_users():
     
     conn.close()
 
-# Funzione per creare un evento
-def create_event():
-    event_name = entry_event_name.get()
-    event_date = entry_event_date.get()
-    event_location = entry_event_location.get()
-    sport = combo_sport.get()
-
-    if event_name and event_date and event_location:
-        # Connettersi al database
-        conn = sqlite3.connect('sports.db')
-        cursor = conn.cursor()
-
-        # Creare la tabella eventi per ogni sport
-        cursor.execute(f'''
-        CREATE TABLE IF NOT EXISTS {sport.lower()}_events (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            event_name TEXT NOT NULL,
-            event_date TEXT NOT NULL,
-            event_location TEXT NOT NULL
-        )
-        ''')
-
-        # Inserire i dati dell'evento nella tabella
-        cursor.execute(f"INSERT INTO {sport.lower()}_events (event_name, event_date, event_location) VALUES (?, ?, ?)", 
-                       (event_name, event_date, event_location))
-
-        conn.commit()
-        conn.close()
-
-        messagebox.showinfo("Evento creato", f"L'evento '{event_name}' è stato creato con successo!")
-        entry_event_name.delete(0, tk.END)
-        entry_event_date.delete(0, tk.END)
-        entry_event_location.delete(0, tk.END)
-    else:
-        messagebox.showwarning("Errore", "Per favore, completa tutti i campi!")
-
-# Funzione per mostrare gli eventi per lo sport selezionato
-def show_events():
-    sport = combo_sport.get()
-
-    # Connettersi al database
-    conn = sqlite3.connect('sports.db')
-    cursor = conn.cursor()
-
-    # Esegui la query per ottenere gli eventi per lo sport selezionato
-    cursor.execute(f"SELECT * FROM {sport.lower()}_events")
-    events = cursor.fetchall()
-
-    # Mostra i risultati in una finestra di dialogo
-    event_list = "\n".join([f"Evento: {event[1]}, Data: {event[2]}, Location: {event[3]}" for event in events])
-
-    if event_list:
-        messagebox.showinfo(f"Eventi per {sport}", event_list)
-    else:
-        messagebox.showinfo(f"Eventi per {sport}", "Nessun evento trovato per questo sport.")
+# Finestra di registrazione separata
+def open_registration_window():
+    reg_window = tk.Toplevel(login_window)
+    reg_window.title("Registrazione")
+    reg_window.geometry("400x400")
+    reg_window.configure(bg="#2e2e2e")
     
-    conn.close()
+    # Titolo registrazione
+    label_title = tk.Label(reg_window, text="Registrazione Nuovo Utente", bg="#2e2e2e", fg="white", font=("Helvetica", 14, "bold"))
+    label_title.pack(pady=20)
+    
+    # Nome utente
+    label_reg_name = tk.Label(reg_window, text="Nome utente:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_reg_name.pack(pady=5)
+    entry_reg_name = tk.Entry(reg_window, font=("Helvetica", 12))
+    entry_reg_name.pack(pady=5)
+    
+    # Password
+    label_reg_password = tk.Label(reg_window, text="Password:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_reg_password.pack(pady=5)
+    entry_reg_password = tk.Entry(reg_window, show="*", font=("Helvetica", 12))
+    entry_reg_password.pack(pady=5)
+    
+    # Livello di gioco
+    label_reg_level = tk.Label(reg_window, text="Livello di gioco:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_reg_level.pack(pady=5)
+    combo_reg_level = ttk.Combobox(reg_window, state="readonly", font=("Helvetica", 12))
+    combo_reg_level['values'] = ("Principiante", "Intermedio", "Avanzato")
+    combo_reg_level.set("Principiante")
+    combo_reg_level.pack(pady=5)
+    
+    # Sport preferito
+    label_reg_sport = tk.Label(reg_window, text="Sport preferito:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
+    label_reg_sport.pack(pady=5)
+    combo_reg_sport = ttk.Combobox(reg_window, state="readonly", font=("Helvetica", 12))
+    combo_reg_sport['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
+    combo_reg_sport.set("BeachVolley")
+    combo_reg_sport.pack(pady=5)
+    
+    # Bottone registrati
+    btn_reg_submit = tk.Button(reg_window, text="Registrati", 
+                               command=lambda: register_user(combo_reg_level, combo_reg_sport, entry_reg_name, entry_reg_password),
+                               bg="#0d7377", fg="white", font=("Helvetica", 12), activebackground="#14919b", activeforeground="white", padx=20, pady=10)
+    btn_reg_submit.pack(pady=20)
 
 # Finestra di login
 login_window = tk.Tk()
 login_window.title("Login / Registrazione")
-login_window.geometry("1280x720")
+login_window.geometry("800x600")
 login_window.configure(bg="#2e2e2e")
 
 # Stile per i bottoni della finestra di login
@@ -238,6 +517,10 @@ style = ttk.Style()
 style.theme_use("clam")
 style.configure("TButton", font=("Helvetica", 12), padding=10, background="#0d7377", foreground="white")
 style.map("TButton", background=[("active", "#14919b")])
+
+# Titolo login
+label_title = tk.Label(login_window, text="Accedi", bg="#2e2e2e", fg="white", font=("Helvetica", 14, "bold"))
+label_title.pack(pady=20)
 
 # Layout per il login
 label_name = tk.Label(login_window, text="Nome utente:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
@@ -252,29 +535,18 @@ label_password.pack(pady=5)
 entry_password = tk.Entry(login_window, show="*", font=("Helvetica", 12))
 entry_password.pack(pady=5)
 
+# Bottone Accedi
 btn_login = tk.Button(login_window, text="Accedi", command=lambda: login_user(entry_name, entry_password), 
                       bg="#0d7377", fg="white", font=("Helvetica", 12), activebackground="#14919b", activeforeground="white", padx=20, pady=10)
 btn_login.pack(pady=20)
 
+# Etichetta Oppure
+label_or = tk.Label(login_window, text="Oppure", bg="#2e2e2e", fg="white", font=("Helvetica", 10))
+label_or.pack(pady=5)
 
-# Livello di gioco
-label_level = tk.Label(login_window, text="Livello di gioco:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-label_level.pack(pady=5)
-combo_level = ttk.Combobox(login_window, state="readonly", font=("Helvetica", 12))
-combo_level['values'] = ("Principiante", "Intermedio", "Avanzato")
-combo_level.set("Principiante")
-combo_level.pack(pady=5)
-
-# Sport preferito
-label_sport = tk.Label(login_window, text="Sport preferito:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-label_sport.pack(pady=5)
-combo_sport = ttk.Combobox(login_window, state="readonly", font=("Helvetica", 12))
-combo_sport['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
-combo_sport.set("BeachVolley")
-combo_sport.pack(pady=5)
-
-btn_register = tk.Button(login_window, text="Registrati", command=lambda: register_user(combo_level, combo_sport, entry_name, entry_password),
-                         bg="#0d7377", fg="white", font=("Helvetica", 12), activebackground="#14919b", activeforeground="white", padx=20, pady=10)
+# Bottone Registrati
+btn_register = tk.Button(login_window, text="Registrati", command=open_registration_window,
+                         bg="#14919b", fg="white", font=("Helvetica", 12), activebackground="#0d7377", activeforeground="white", padx=20, pady=10)
 btn_register.pack(pady=10)
 
 login_window.mainloop()
