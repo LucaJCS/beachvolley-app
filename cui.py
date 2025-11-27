@@ -1,7 +1,6 @@
 import sqlite3
 from rich.console import Console
 from rich.table import Table
-from rich import box
 
 # Inizializza la console rich
 console = Console()

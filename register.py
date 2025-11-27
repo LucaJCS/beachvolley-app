@@ -499,51 +499,48 @@ def open_create_event_window(sport_selected):
         create_event_window_instance.focus()
         return
     
-    create_window = tk.Toplevel()
-    create_event_window_instance = create_window
-    create_window.title("Crea Evento")
-    create_window.geometry("700x600")
-    create_window.configure(bg="#2e2e2e")
+    event_window = create_window("Crea Evento", 700, 600)
+    create_event_window_instance = event_window
     
     # Titolo
-    label_title = tk.Label(create_window, text="Crea Nuovo Evento", bg="#2e2e2e", fg="white", font=("Helvetica", 14, "bold"))
-    label_title.pack(pady=20)
+    label_title = create_title_label(event_window, "Crea Nuovo Evento")
+    label_title.pack(pady=PADDING["large"])
     
     # Sport
-    label_sport = tk.Label(create_window, text="Sport:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-    label_sport.pack(pady=10)
-    combo_sport_create = ttk.Combobox(create_window, state="readonly", font=("Helvetica", 12), width=30)
+    label_sport = create_label(event_window, "Sport:")
+    label_sport.pack(pady=PADDING["medium"])
+    combo_sport_create = create_combobox(event_window, width=30)
     combo_sport_create['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
     combo_sport_create.set(sport_selected)
-    combo_sport_create.pack(pady=10)
+    combo_sport_create.pack(pady=PADDING["medium"])
     
     # Nome evento
-    label_event_name = tk.Label(create_window, text="Nome Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-    label_event_name.pack(pady=5)
-    entry_event_name = tk.Entry(create_window, font=("Helvetica", 12), width=30)
-    entry_event_name.pack(pady=5)
+    label_event_name = create_label(event_window, "Nome Evento:")
+    label_event_name.pack(pady=PADDING["small"])
+    entry_event_name = tk.Entry(event_window, font=FONTS["label"], width=30)
+    entry_event_name.pack(pady=PADDING["small"])
     
     # Data evento
-    label_event_date = tk.Label(create_window, text="Data Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-    label_event_date.pack(pady=5)
-    entry_event_date = tk.Entry(create_window, font=("Helvetica", 12), width=30)
-    entry_event_date.pack(pady=5)
+    label_event_date = create_label(event_window, "Data Evento:")
+    label_event_date.pack(pady=PADDING["small"])
+    entry_event_date = tk.Entry(event_window, font=FONTS["label"], width=30)
+    entry_event_date.pack(pady=PADDING["small"])
     
     # Luogo evento
-    label_event_location = tk.Label(create_window, text="Luogo Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-    label_event_location.pack(pady=5)
-    entry_event_location = tk.Entry(create_window, font=("Helvetica", 12), width=30)
-    entry_event_location.pack(pady=5)
+    label_event_location = create_label(event_window, "Luogo Evento:")
+    label_event_location.pack(pady=PADDING["small"])
+    entry_event_location = tk.Entry(event_window, font=FONTS["label"], width=30)
+    entry_event_location.pack(pady=PADDING["small"])
     
     # Descrizione evento
-    label_event_description = tk.Label(create_window, text="Descrizione Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-    label_event_description.pack(pady=5)
-    text_event_description = tk.Text(create_window, height=4, width=35, bg="#1e1e1e", fg="white", font=("Helvetica", 10))
-    text_event_description.pack(pady=5)
+    label_event_description = create_label(event_window, "Descrizione Evento:")
+    label_event_description.pack(pady=PADDING["small"])
+    text_event_description = create_text_widget(event_window, height=4, width=35)
+    text_event_description.pack(pady=PADDING["small"])
     
     # Area messaggi
-    text_messages = tk.Text(create_window, height=3, width=50, bg="#1e1e1e", fg="#00ff00", font=("Helvetica", 10))
-    text_messages.pack(pady=10, padx=10)
+    text_messages = create_text_widget(event_window, height=3, width=50, text_color=THEME["fg_success"])
+    text_messages.pack(pady=PADDING["medium"], padx=PADDING["medium"])
     
     # Bottone crea
     def create_event_from_window():
@@ -556,6 +553,7 @@ def open_create_event_window(sport_selected):
         if event_name and event_date and event_location:
             try:
                 conn = sqlite3.connect('sports.db')
+                conn.isolation_level = None  # Autocommit mode
                 cursor = conn.cursor()
                 
                 # Crea nella tabella centrale sport_events
@@ -576,6 +574,9 @@ def open_create_event_window(sport_selected):
                 except sqlite3.OperationalError:
                     pass
                 
+                # Disabilita temporaneamente autocommit per questa operazione
+                conn.isolation_level = ""
+                
                 cursor.execute("INSERT INTO sport_events (sport, event_name, event_date, event_location, description) VALUES (?, ?, ?, ?, ?)", 
                                (sport, event_name, event_date, event_location, event_description))
                 
@@ -585,30 +586,30 @@ def open_create_event_window(sport_selected):
                 cursor.execute("SELECT last_insert_rowid()")
                 event_id = cursor.fetchone()[0]
                 
+                # Verifica che l'evento sia stato inserito
+                cursor.execute("SELECT * FROM sport_events WHERE id = ?", (event_id,))
+                inserted_event = cursor.fetchone()
+                
+                if not inserted_event:
+                    raise Exception("Evento non trovato dopo l'inserimento!")
+                
                 conn.close()
                 
                 # Crea la tabella dei partecipanti per questo evento
                 create_event_participants_table(sport, event_id)
                 
-                text_messages.config(fg="#00ff00")
-                text_messages.delete(1.0, tk.END)
-                text_messages.insert(tk.END, f"✓ Evento '{event_name}' creato con successo!")
+                set_text_message(text_messages, f"✓ Evento '{event_name}' creato con successo!", THEME["fg_success"])
                 entry_event_name.delete(0, tk.END)
                 entry_event_date.delete(0, tk.END)
                 entry_event_location.delete(0, tk.END)
+                text_event_description.delete(1.0, tk.END)
             except Exception as e:
-                text_messages.config(fg="#ff0000")
-                text_messages.delete(1.0, tk.END)
-                text_messages.insert(tk.END, f"✗ Errore: {str(e)}")
+                set_text_message(text_messages, f"✗ Errore: {str(e)}", THEME["fg_error"])
         else:
-            text_messages.config(fg="#ff0000")
-            text_messages.delete(1.0, tk.END)
-            text_messages.insert(tk.END, "✗ Compila tutti i campi!")
+            set_text_message(text_messages, "✗ Compila tutti i campi!", THEME["fg_error"])
     
-    btn_create = tk.Button(create_window, text="Crea Evento", command=create_event_from_window,
-                          bg="#0d7377", fg="white", font=("Helvetica", 12), 
-                          activebackground="#14919b", activeforeground="white", padx=20, pady=10)
-    btn_create.pack(pady=20)
+    btn_create = create_primary_button(event_window, "Crea Evento", command=create_event_from_window)
+    btn_create.pack(pady=PADDING["large"])
 
 def open_main_window(name):
     global combo_sport
