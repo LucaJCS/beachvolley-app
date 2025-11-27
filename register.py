@@ -9,6 +9,15 @@ try:
 except ImportError:
     generate_pdf_report = None
 
+# Importa componenti GUI e tema
+from gui_theme import THEME, FONTS, PADDING, DIMENSIONS
+from gui_components import (
+    create_window, create_title_label, create_label, create_text_widget,
+    create_combobox, create_primary_button, create_secondary_button,
+    create_small_button, create_frame, set_text_message, update_text_content,
+    create_subtitle_label
+)
+
 # Creazione della tabella 'users' se non esiste già
 def create_users_table():
     conn = sqlite3.connect('sports.db')
@@ -197,31 +206,28 @@ def open_show_users_window():
         users_window_instance.focus()
         return
     
-    users_window = tk.Toplevel()
+    users_window = create_window("Visualizza Utenti", 800, 700)
     users_window_instance = users_window
-    users_window.title("Visualizza Utenti")
-    users_window.geometry("800x700")
-    users_window.configure(bg="#2e2e2e")
     
     # Titolo
-    label_title = tk.Label(users_window, text="Visualizza Utenti", bg="#2e2e2e", fg="white", font=("Helvetica", 14, "bold"))
-    label_title.pack(pady=20)
+    label_title = create_title_label(users_window, "Visualizza Utenti")
+    label_title.pack(pady=PADDING["large"])
     
     # Sport preferito
-    label_sport = tk.Label(users_window, text="Seleziona Sport:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-    label_sport.pack(pady=10)
-    combo_sport_users = ttk.Combobox(users_window, state="readonly", font=("Helvetica", 12), width=30)
+    label_sport = create_label(users_window, "Seleziona Sport:")
+    label_sport.pack(pady=PADDING["medium"])
+    combo_sport_users = create_combobox(users_window, width=30)
     combo_sport_users['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
     combo_sport_users.set("BeachVolley")
-    combo_sport_users.pack(pady=10)
+    combo_sport_users.pack(pady=PADDING["medium"])
     
     # Area per i risultati
-    text_results = tk.Text(users_window, height=12, width=60, bg="#1e1e1e", fg="white", font=("Helvetica", 11))
-    text_results.pack(pady=10, padx=10)
+    text_results = create_text_widget(users_window, height=12, width=60)
+    text_results.pack(pady=PADDING["medium"], padx=PADDING["medium"])
     
     # Area messaggi
-    text_messages = tk.Text(users_window, height=3, width=60, bg="#1e1e1e", fg="#00ff00", font=("Helvetica", 10))
-    text_messages.pack(pady=5, padx=10)
+    text_messages = create_text_widget(users_window, height=3, width=60, text_color=THEME["fg_success"])
+    text_messages.pack(pady=PADDING["small"], padx=PADDING["medium"])
     
     # Funzione per visualizzare gli utenti
     def show_users_from_window():
@@ -236,28 +242,18 @@ def open_show_users_window():
             if users:
                 for user in users:
                     text_results.insert(tk.END, f"{user[1]} (Livello: {user[2]})\n")
-                text_messages.config(fg="#00ff00")
-                text_messages.delete(1.0, tk.END)
-                text_messages.insert(tk.END, f"✓ Utenti caricati: {len(users)}")
+                set_text_message(text_messages, f"✓ Utenti caricati: {len(users)}", THEME["fg_success"])
             else:
                 text_results.insert(tk.END, f"Nessun utente trovato per {sport}.")
-                text_messages.config(fg="#ffaa00")
-                text_messages.delete(1.0, tk.END)
-                text_messages.insert(tk.END, "Nessun utente per questo sport")
+                set_text_message(text_messages, "Nessun utente per questo sport", THEME["fg_warning"])
         except Exception as e:
             text_results.delete(1.0, tk.END)
-            text_messages.config(fg="#ff0000")
-            text_messages.delete(1.0, tk.END)
-            text_messages.insert(tk.END, f"Errore: {str(e)}")
+            set_text_message(text_messages, f"Errore: {str(e)}", THEME["fg_error"])
         conn.close()
     
     # Bottone visualizza
-    btn_visualize = tk.Button(users_window, text="Visualizza", 
-                              command=show_users_from_window,
-                              bg="#0d7377", fg="white", font=("Helvetica", 12), 
-                              activebackground="#14919b", activeforeground="white", padx=20, pady=10)
-    btn_visualize.pack(pady=20)
-    btn_visualize.pack(pady=20)
+    btn_visualize = create_primary_button(users_window, "Visualizza", command=show_users_from_window)
+    btn_visualize.pack(pady=PADDING["large"])
     
     # Carica gli utenti al primo sport
     show_users_from_window()
@@ -271,75 +267,66 @@ def open_show_events_window(username):
         events_window_instance.focus()
         return
     
-    events_window = tk.Toplevel()
+    events_window = create_window("Visualizza Eventi", 1200, 900)
     events_window_instance = events_window
-    events_window.title("Visualizza Eventi")
-    events_window.geometry("1200x900")
-    events_window.configure(bg="#2e2e2e")
     
     # Titolo
-    label_title = tk.Label(events_window, text="Visualizza Eventi", bg="#2e2e2e", fg="white", font=("Helvetica", 14, "bold"))
-    label_title.pack(pady=20)
+    label_title = create_title_label(events_window, "Visualizza Eventi")
+    label_title.pack(pady=PADDING["large"])
     
     # Sport preferito
-    label_sport = tk.Label(events_window, text="Seleziona Sport:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-    label_sport.pack(pady=10)
-    combo_sport_events = ttk.Combobox(events_window, state="readonly", font=("Helvetica", 12), width=30)
+    label_sport = create_label(events_window, "Seleziona Sport:")
+    label_sport.pack(pady=PADDING["medium"])
+    combo_sport_events = create_combobox(events_window, width=30)
     combo_sport_events['values'] = ("BeachVolley", "Tennis", "Calcetto", "Padel")
     combo_sport_events.set("BeachVolley")
-    combo_sport_events.pack(pady=10)
+    combo_sport_events.pack(pady=PADDING["medium"])
     
     # Area per i risultati
-    text_results = tk.Text(events_window, height=10, width=70, bg="#1e1e1e", fg="white", font=("Helvetica", 11))
-    text_results.pack(pady=10, padx=10)
+    text_results = create_text_widget(events_window, height=10, width=70)
+    text_results.pack(pady=PADDING["medium"], padx=PADDING["medium"])
     
     # Selezione evento
-    label_select_event = tk.Label(events_window, text="Seleziona Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 12))
-    label_select_event.pack(pady=10)
-    combo_events = ttk.Combobox(events_window, state="readonly", font=("Helvetica", 12), width=70)
-    combo_events.pack(pady=10, padx=10)
+    label_select_event = create_label(events_window, "Seleziona Evento:")
+    label_select_event.pack(pady=PADDING["medium"])
+    combo_events = create_combobox(events_window, width=70)
+    combo_events.pack(pady=PADDING["medium"], padx=PADDING["medium"])
     
     # Area messaggi
-    text_messages = tk.Text(events_window, height=2, width=70, bg="#1e1e1e", fg="#00ff00", font=("Helvetica", 10))
-    text_messages.pack(pady=5, padx=10)
+    text_messages = create_text_widget(events_window, height=2, width=70, text_color=THEME["fg_success"])
+    text_messages.pack(pady=PADDING["small"], padx=PADDING["medium"])
     
     # Frame per descrizione e commenti
-    frame_details = tk.Frame(events_window, bg="#2e2e2e")
-    frame_details.pack(pady=10, padx=10, fill=tk.BOTH, expand=True)
+    frame_details = create_frame(events_window)
+    frame_details.pack(pady=PADDING["medium"], padx=PADDING["medium"], fill=tk.BOTH, expand=True)
     
     # Sinistra: Descrizione evento
-    frame_left = tk.Frame(frame_details, bg="#2e2e2e")
-    frame_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=5)
+    frame_left = create_frame(frame_details)
+    frame_left.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=PADDING["small"])
     
-    label_description = tk.Label(frame_left, text="Descrizione Evento:", bg="#2e2e2e", fg="white", font=("Helvetica", 11, "bold"))
-    label_description.pack(pady=5)
-    text_description = tk.Text(frame_left, height=15, width=40, bg="#1e1e1e", fg="white", font=("Helvetica", 10))
-    text_description.pack(pady=5, fill=tk.BOTH, expand=True)
+    label_description = create_subtitle_label(frame_left, "Descrizione Evento:")
+    label_description.pack(pady=PADDING["small"])
+    text_description = create_text_widget(frame_left, height=15, width=40)
+    text_description.pack(pady=PADDING["small"], fill=tk.BOTH, expand=True)
     
     # Destra: Commenti
-    frame_right = tk.Frame(frame_details, bg="#2e2e2e")
-    frame_right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=5)
+    frame_right = create_frame(frame_details)
+    frame_right.pack(side=tk.RIGHT, fill=tk.BOTH, expand=True, padx=PADDING["small"])
     
-    label_comments = tk.Label(frame_right, text="Commenti:", bg="#2e2e2e", fg="white", font=("Helvetica", 11, "bold"))
-    label_comments.pack(pady=5)
-    text_comments = tk.Text(frame_right, height=12, width=40, bg="#1e1e1e", fg="#88ff88", font=("Helvetica", 9))
-    text_comments.pack(pady=5, fill=tk.BOTH, expand=True)
+    label_comments = create_subtitle_label(frame_right, "Commenti:")
+    label_comments.pack(pady=PADDING["small"])
+    text_comments = create_text_widget(frame_right, height=12, width=40, text_color=THEME["fg_info"])
+    text_comments.pack(pady=PADDING["small"], fill=tk.BOTH, expand=True)
     
     # Frame per inserire commenti
-    frame_new_comment = tk.Frame(frame_right, bg="#2e2e2e")
-    frame_new_comment.pack(pady=5, fill=tk.X)
+    frame_new_comment = create_frame(frame_right)
+    frame_new_comment.pack(pady=PADDING["small"], fill=tk.X)
     
-    label_new_comment = tk.Label(frame_new_comment, text="Nuovo commento:", bg="#2e2e2e", fg="white", font=("Helvetica", 9))
-    label_new_comment.pack(side=tk.LEFT, padx=5)
+    label_new_comment = create_label(frame_new_comment, "Nuovo commento:", font_type="smaller")
+    label_new_comment.pack(side=tk.LEFT, padx=PADDING["small"])
     
-    entry_new_comment = tk.Entry(frame_new_comment, font=("Helvetica", 9), width=25)
-    entry_new_comment.pack(side=tk.LEFT, padx=5, fill=tk.X, expand=True)
-    
-    btn_add_comment = tk.Button(frame_new_comment, text="Invia", 
-                               command=add_comment,
-                               bg="#0d7377", fg="white", font=("Helvetica", 9), 
-                               activebackground="#14919b", activeforeground="white")
-    btn_add_comment.pack(side=tk.LEFT, padx=5)
+    entry_new_comment = tk.Entry(frame_new_comment, font=FONTS["smaller"], width=25)
+    entry_new_comment.pack(side=tk.LEFT, padx=PADDING["small"], fill=tk.X, expand=True)
     
     # Lista per tenere traccia degli event ID
     events_list = []
@@ -351,13 +338,8 @@ def open_show_events_window(username):
         nonlocal current_event_id, current_sport
         
         if not combo_events.get():
-            text_description.config(state=tk.NORMAL)
-            text_description.delete(1.0, tk.END)
-            text_description.insert(tk.END, "Seleziona un evento per visualizzare i dettagli")
-            text_description.config(state=tk.DISABLED)
-            text_comments.config(state=tk.NORMAL)
-            text_comments.delete(1.0, tk.END)
-            text_comments.config(state=tk.DISABLED)
+            update_text_content(text_description, "Seleziona un evento per visualizzare i dettagli")
+            update_text_content(text_comments, "")
             return
         
         event_num = int(combo_events.get().split(".")[0])
@@ -375,29 +357,20 @@ def open_show_events_window(username):
             cursor.execute("SELECT description FROM sport_events WHERE id = ?", (event_id,))
             result = cursor.fetchone()
             description = result[0] if result and result[0] else "Nessuna descrizione disponibile"
-            
-            text_description.config(state=tk.NORMAL)
-            text_description.delete(1.0, tk.END)
-            text_description.insert(tk.END, description)
-            text_description.config(state=tk.DISABLED)
+            update_text_content(text_description, description)
             
             # Carica commenti
             cursor.execute(f"SELECT username, comment FROM {sport.lower()}_event_{event_id}_comments ORDER BY timestamp DESC")
             comments = cursor.fetchall()
             
-            text_comments.config(state=tk.NORMAL)
-            text_comments.delete(1.0, tk.END)
             if comments:
-                for username, comment in comments:
-                    text_comments.insert(tk.END, f"{username}: {comment}\n\n")
+                comments_text = "\n\n".join([f"{username}: {comment}" for username, comment in comments])
             else:
-                text_comments.insert(tk.END, "Nessun commento ancora. Sii il primo a commentare!")
-            text_comments.config(state=tk.DISABLED)
+                comments_text = "Nessun commento ancora. Sii il primo a commentare!"
+            
+            update_text_content(text_comments, comments_text)
         except Exception as e:
-            text_description.config(state=tk.NORMAL)
-            text_description.delete(1.0, tk.END)
-            text_description.insert(tk.END, f"Errore nel caricamento: {str(e)}")
-            text_description.config(state=tk.DISABLED)
+            update_text_content(text_description, f"Errore nel caricamento: {str(e)}")
         finally:
             conn.close()
     
@@ -432,69 +405,50 @@ def open_show_events_window(username):
                     event_list.append(f"{i}. {event_name}")
                 
                 combo_events['values'] = event_list
-                text_messages.config(fg="#00ff00")
-                text_messages.delete(1.0, tk.END)
-                text_messages.insert(tk.END, f"✓ {len(events)} eventi trovati")
+                set_text_message(text_messages, f"✓ {len(events)} eventi trovati", THEME["fg_success"])
             else:
                 text_results.insert(tk.END, f"Nessun evento trovato per {sport}.")
-                text_messages.config(fg="#ffaa00")
-                text_messages.delete(1.0, tk.END)
-                text_messages.insert(tk.END, "Nessun evento disponibile")
+                set_text_message(text_messages, "Nessun evento disponibile", THEME["fg_warning"])
         except Exception as e:
             text_results.delete(1.0, tk.END)
             text_results.insert(tk.END, f"Errore: {str(e)}")
-            text_messages.config(fg="#ff0000")
-            text_messages.delete(1.0, tk.END)
-            text_messages.insert(tk.END, f"Errore: {str(e)}")
+            set_text_message(text_messages, f"Errore: {str(e)}", THEME["fg_error"])
         conn.close()
     
     # Funzione per iscriversi all'evento
     def subscribe_to_event():
         try:
             if not combo_events.get():
-                text_messages.config(fg="#ff0000")
-                text_messages.delete(1.0, tk.END)
-                text_messages.insert(tk.END, "✗ Seleziona un evento")
+                set_text_message(text_messages, "✗ Seleziona un evento", THEME["fg_error"])
                 return
             
             event_num = int(combo_events.get().split(".")[0])
             if event_num < 1 or event_num > len(events_list):
-                text_messages.config(fg="#ff0000")
-                text_messages.delete(1.0, tk.END)
-                text_messages.insert(tk.END, "✗ Numero evento non valido!")
+                set_text_message(text_messages, "✗ Numero evento non valido!", THEME["fg_error"])
                 return
             
             event_id, sport = events_list[event_num - 1]
             success, message = register_to_event(sport, event_id, username)
             
             if success:
-                text_messages.config(fg="#00ff00")
                 show_events_from_window()  # Ricarica gli eventi
                 combo_events.set('')
+                set_text_message(text_messages, message, THEME["fg_success"])
             else:
-                text_messages.config(fg="#ff0000")
-            
-            text_messages.delete(1.0, tk.END)
-            text_messages.insert(tk.END, message)
+                set_text_message(text_messages, message, THEME["fg_error"])
         except (ValueError, IndexError) as e:
-            text_messages.config(fg="#ff0000")
-            text_messages.delete(1.0, tk.END)
-            text_messages.insert(tk.END, f"✗ Errore: {str(e)}")
+            set_text_message(text_messages, f"✗ Errore: {str(e)}", THEME["fg_error"])
     
     # Funzione per aggiungere commento
     def add_comment():
         comment_text = entry_new_comment.get().strip()
         
         if not comment_text:
-            text_messages.config(fg="#ff0000")
-            text_messages.delete(1.0, tk.END)
-            text_messages.insert(tk.END, "✗ Inserisci un commento")
+            set_text_message(text_messages, "✗ Inserisci un commento", THEME["fg_error"])
             return
         
         if not current_event_id or not current_sport:
-            text_messages.config(fg="#ff0000")
-            text_messages.delete(1.0, tk.END)
-            text_messages.insert(tk.END, "✗ Seleziona un evento prima")
+            set_text_message(text_messages, "✗ Seleziona un evento prima", THEME["fg_error"])
             return
         
         conn = sqlite3.connect('sports.db')
@@ -513,30 +467,25 @@ def open_show_events_window(username):
             entry_new_comment.delete(0, tk.END)
             load_event_details()  # Ricarica i commenti
             
-            text_messages.config(fg="#00ff00")
-            text_messages.delete(1.0, tk.END)
-            text_messages.insert(tk.END, "✓ Commento aggiunto con successo!")
+            set_text_message(text_messages, "✓ Commento aggiunto con successo!", THEME["fg_success"])
         except Exception as e:
-            text_messages.config(fg="#ff0000")
-            text_messages.delete(1.0, tk.END)
-            text_messages.insert(tk.END, f"✗ Errore: {str(e)}")
+            set_text_message(text_messages, f"✗ Errore: {str(e)}", THEME["fg_error"])
         finally:
             conn.close()
     
+    # Crea il bottone dopo la definizione della funzione add_comment
+    btn_add_comment = create_small_button(frame_new_comment, "Invia", command=add_comment)
+    btn_add_comment.pack(side=tk.LEFT, padx=PADDING["small"])
+    
     # Bottoni
-    button_frame = tk.Frame(events_window, bg="#2e2e2e")
-    button_frame.pack(pady=20)
+    button_frame = create_frame(events_window)
+    button_frame.pack(pady=PADDING["large"])
     
-    btn_visualize = tk.Button(button_frame, text="Visualizza", 
-                              command=show_events_from_window,
-                              bg="#0d7377", fg="white", font=("Helvetica", 12), 
-                              activebackground="#14919b", activeforeground="white", padx=20, pady=10)
-    btn_visualize.pack(side=tk.LEFT, padx=10)
+    btn_visualize = create_primary_button(button_frame, "Visualizza", command=show_events_from_window)
+    btn_visualize.pack(side=tk.LEFT, padx=PADDING["medium"])
     
-    btn_subscribe = tk.Button(button_frame, text="Iscriviti", command=subscribe_to_event,
-                             bg="#14919b", fg="white", font=("Helvetica", 12), 
-                             activebackground="#0d7377", activeforeground="white", padx=20, pady=10)
-    btn_subscribe.pack(side=tk.LEFT, padx=10)
+    btn_subscribe = create_secondary_button(button_frame, "Iscriviti", command=subscribe_to_event)
+    btn_subscribe.pack(side=tk.LEFT, padx=PADDING["medium"])
     
     # Carica gli eventi al primo sport
     show_events_from_window()

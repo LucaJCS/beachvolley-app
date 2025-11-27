@@ -14,7 +14,7 @@ import os
 # Configurazione matplotlib per evitare problemi di display
 matplotlib.use('Agg')
 
-# Dizionario con i limiti di partecipanti per sport
+# Limiti di partecipanti per sport
 SPORT_LIMITS = {
     "BeachVolley": 8,
     "Tennis": 2,
