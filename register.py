@@ -19,7 +19,7 @@ from gui_components import (
 )
 
 # Creazione della tabella 'users' se non esiste già
-def create_users_table():
+def crea_tabella_utenti():
     conn = sqlite3.connect('sports.db')
     cursor = conn.cursor()
     
@@ -38,7 +38,7 @@ def create_users_table():
     conn.close()
 
 # Chiama la funzione per creare la tabella users all'inizio del programma
-create_users_table()
+crea_tabella_utenti()
 
 # Dizionario con i limiti di partecipanti per sport
 SPORT_LIMITS = {
@@ -54,7 +54,7 @@ events_window_instance = None
 create_event_window_instance = None
 
 # Funzione per creare tabella partecipanti per un evento
-def create_event_participants_table(sport, event_id):
+def crea_tabella_partecipanti_evento(sport, event_id):
     conn = sqlite3.connect('sports.db')
     cursor = conn.cursor()
     try:
@@ -74,7 +74,7 @@ def create_event_participants_table(sport, event_id):
     conn.close()
 
 # Funzione per iscrivere un utente a un evento
-def register_to_event(sport, event_id, username):
+def iscrivi_evento(sport, event_id, username):
     conn = sqlite3.connect('sports.db')
     cursor = conn.cursor()
     
@@ -108,7 +108,7 @@ def register_to_event(sport, event_id, username):
         conn.close()
 
 # Funzione per ottenere il numero di partecipanti
-def get_event_participants_count(event_id):
+def ottieni_numero_partecipanti(event_id):
     conn = sqlite3.connect('sports.db')
     cursor = conn.cursor()
     try:
@@ -128,7 +128,7 @@ def get_event_participants_count(event_id):
     return count
 
 # Funzione per registrare l'utente
-def register_user(combo_level, combo_sport, entry_name, entry_password):
+def registra_utente(combo_level, combo_sport, entry_name, entry_password):
     name = entry_name.get()
     password = entry_password.get()
     level = combo_level.get()
@@ -167,7 +167,7 @@ def register_user(combo_level, combo_sport, entry_name, entry_password):
         messagebox.showwarning("Errore", "Per favore, completa tutti i campi!")
 
 # Funzione di login (accesso)
-def login_user(entry_name, entry_password):
+def accedi_utente(entry_name, entry_password):
     name = entry_name.get()
     password = entry_password.get()
 
@@ -182,7 +182,7 @@ def login_user(entry_name, entry_password):
             if password == db_password:
                 messagebox.showinfo("Benvenuto", f"Benvenuto, {name}!")
                 login_window.destroy()  # Chiudi la finestra di login
-                open_main_window(name)  # Apri la finestra principale
+                apri_finestra_principale(name)  # Apri la finestra principale
             else:
                 messagebox.showwarning("Errore", "Password errata.")
         else:
@@ -197,7 +197,7 @@ events_window_instance = None
 create_event_window_instance = None
 
 # Funzione per aprire la finestra principale
-def open_show_users_window():
+def apri_finestra_utenti():
     global users_window_instance
     
     # Se la finestra è già aperta, portala in primo piano
@@ -230,7 +230,7 @@ def open_show_users_window():
     text_messages.pack(pady=PADDING["small"], padx=PADDING["medium"])
     
     # Funzione per visualizzare gli utenti
-    def show_users_from_window():
+    def visualizza_utenti():
         sport = combo_sport_users.get()
         conn = sqlite3.connect('sports.db')
         cursor = conn.cursor()
@@ -252,13 +252,13 @@ def open_show_users_window():
         conn.close()
     
     # Bottone visualizza
-    btn_visualize = create_primary_button(users_window, "Visualizza", command=show_users_from_window)
+    btn_visualize = create_primary_button(users_window, "Visualizza", command=visualizza_utenti)
     btn_visualize.pack(pady=PADDING["large"])
     
     # Carica gli utenti al primo sport
-    show_users_from_window()
+    visualizza_utenti()
 
-def open_show_events_window(username):
+def apri_finestra_eventi(username):
     global events_window_instance
     
     # Se la finestra è già aperta, portala in primo piano e aggiorna
@@ -334,7 +334,7 @@ def open_show_events_window(username):
     current_sport = None
     
     # Funzione per caricare i commenti di un evento
-    def load_event_details():
+    def carica_dettagli_evento():
         nonlocal current_event_id, current_sport
         
         if not combo_events.get():
@@ -375,10 +375,10 @@ def open_show_events_window(username):
             conn.close()
     
     # Aggiorna combo_events con il comando di caricamento dettagli
-    combo_events.bind("<<ComboboxSelected>>", lambda e: load_event_details())
+    combo_events.bind("<<ComboboxSelected>>", lambda e: carica_dettagli_evento())
     
     # Funzione per visualizzare gli eventi
-    def show_events_from_window():
+    def visualizza_eventi():
         nonlocal events_list
         sport = combo_sport_events.get()
         conn = sqlite3.connect('sports.db')
@@ -397,7 +397,7 @@ def open_show_events_window(username):
                     event_id = event[0]
                     event_name = event[2]
                     event_date = event[3]
-                    participants = get_event_participants_count(event_id)
+                    participants = ottieni_numero_partecipanti(event_id)
                     max_participants = SPORT_LIMITS.get(sport, 0)
                     
                     text_results.insert(tk.END, f"[{i}] {event_name} - {event_date} ({participants}/{max_participants} partecipanti)\n")
@@ -416,7 +416,7 @@ def open_show_events_window(username):
         conn.close()
     
     # Funzione per iscriversi all'evento
-    def subscribe_to_event():
+    def iscriviti_evento():
         try:
             if not combo_events.get():
                 set_text_message(text_messages, "✗ Seleziona un evento", THEME["fg_error"])
@@ -428,10 +428,10 @@ def open_show_events_window(username):
                 return
             
             event_id, sport = events_list[event_num - 1]
-            success, message = register_to_event(sport, event_id, username)
+            success, message = iscrivi_evento(sport, event_id, username)
             
             if success:
-                show_events_from_window()  # Ricarica gli eventi
+                visualizza_eventi()  # Ricarica gli eventi
                 combo_events.set('')
                 set_text_message(text_messages, message, THEME["fg_success"])
             else:
@@ -440,7 +440,7 @@ def open_show_events_window(username):
             set_text_message(text_messages, f"✗ Errore: {str(e)}", THEME["fg_error"])
     
     # Funzione per aggiungere commento
-    def add_comment():
+    def aggiungi_commento():
         comment_text = entry_new_comment.get().strip()
         
         if not comment_text:
@@ -465,7 +465,7 @@ def open_show_events_window(username):
             conn.commit()
             
             entry_new_comment.delete(0, tk.END)
-            load_event_details()  # Ricarica i commenti
+            carica_dettagli_evento()  # Ricarica i commenti
             
             set_text_message(text_messages, "✓ Commento aggiunto con successo!", THEME["fg_success"])
         except Exception as e:
@@ -473,24 +473,24 @@ def open_show_events_window(username):
         finally:
             conn.close()
     
-    # Crea il bottone dopo la definizione della funzione add_comment
-    btn_add_comment = create_small_button(frame_new_comment, "Invia", command=add_comment)
+    # Crea il bottone dopo la definizione della funzione aggiungi_commento
+    btn_add_comment = create_small_button(frame_new_comment, "Invia", command=aggiungi_commento)
     btn_add_comment.pack(side=tk.LEFT, padx=PADDING["small"])
     
     # Bottoni
     button_frame = create_frame(events_window)
     button_frame.pack(pady=PADDING["large"])
     
-    btn_visualize = create_primary_button(button_frame, "Visualizza", command=show_events_from_window)
+    btn_visualize = create_primary_button(button_frame, "Visualizza", command=visualizza_eventi)
     btn_visualize.pack(side=tk.LEFT, padx=PADDING["medium"])
     
-    btn_subscribe = create_secondary_button(button_frame, "Iscriviti", command=subscribe_to_event)
+    btn_subscribe = create_secondary_button(button_frame, "Iscriviti", command=iscriviti_evento)
     btn_subscribe.pack(side=tk.LEFT, padx=PADDING["medium"])
     
     # Carica gli eventi al primo sport
-    show_events_from_window()
+    visualizza_eventi()
 
-def open_create_event_window(sport_selected):
+def apri_finestra_crea_evento(sport_selected):
     global create_event_window_instance
     
     # Se la finestra è già aperta, portala in primo piano
@@ -543,7 +543,7 @@ def open_create_event_window(sport_selected):
     text_messages.pack(pady=PADDING["medium"], padx=PADDING["medium"])
     
     # Bottone crea
-    def create_event_from_window():
+    def crea_evento():
         event_name = entry_event_name.get()
         event_date = entry_event_date.get()
         event_location = entry_event_location.get()
@@ -596,7 +596,7 @@ def open_create_event_window(sport_selected):
                 conn.close()
                 
                 # Crea la tabella dei partecipanti per questo evento
-                create_event_participants_table(sport, event_id)
+                crea_tabella_partecipanti_evento(sport, event_id)
                 
                 set_text_message(text_messages, f"✓ Evento '{event_name}' creato con successo!", THEME["fg_success"])
                 entry_event_name.delete(0, tk.END)
@@ -608,10 +608,10 @@ def open_create_event_window(sport_selected):
         else:
             set_text_message(text_messages, "✗ Compila tutti i campi!", THEME["fg_error"])
     
-    btn_create = create_primary_button(event_window, "Crea Evento", command=create_event_from_window)
+    btn_create = create_primary_button(event_window, "Crea Evento", command=crea_evento)
     btn_create.pack(pady=PADDING["large"])
 
-def open_main_window(name):
+def apri_finestra_principale(name):
     global combo_sport
     
     # Crea la finestra principale
@@ -645,23 +645,23 @@ def open_main_window(name):
     label_separator.pack(pady=20)
 
     # Pulsanti principali
-    btn_show_users = tk.Button(root, text="Visualizza Utenti", command=open_show_users_window,
+    btn_show_users = tk.Button(root, text="Visualizza Utenti", command=apri_finestra_utenti,
                               bg="#0d7377", fg="white", font=("Helvetica", 12), 
                               activebackground="#14919b", activeforeground="white", padx=30, pady=15, width=25)
     btn_show_users.pack(pady=10)
 
-    btn_show_events = tk.Button(root, text="Visualizza Eventi", command=lambda: open_show_events_window(name),
+    btn_show_events = tk.Button(root, text="Visualizza Eventi", command=lambda: apri_finestra_eventi(name),
                                bg="#0d7377", fg="white", font=("Helvetica", 12), 
                                activebackground="#14919b", activeforeground="white", padx=30, pady=15, width=25)
     btn_show_events.pack(pady=10)
 
-    btn_create_event = tk.Button(root, text="Crea Evento", command=lambda: open_create_event_window(combo_sport.get()),
+    btn_create_event = tk.Button(root, text="Crea Evento", command=lambda: apri_finestra_crea_evento(combo_sport.get()),
                                 bg="#0d7377", fg="white", font=("Helvetica", 12), 
                                 activebackground="#14919b", activeforeground="white", padx=30, pady=15, width=25)
     btn_create_event.pack(pady=10)
     
     # Bottone per generare report
-    def generate_report():
+    def genera_report():
         if generate_pdf_report:
             try:
                 generate_pdf_report('report_sportivi.pdf')
@@ -671,7 +671,7 @@ def open_main_window(name):
         else:
             messagebox.showwarning("Attenzione", "Il modulo generate_reports non è disponibile.")
     
-    btn_report = tk.Button(root, text="Genera Report PDF", command=generate_report,
+    btn_report = tk.Button(root, text="Genera Report PDF", command=genera_report,
                           bg="#ff6b6b", fg="white", font=("Helvetica", 12), 
                           activebackground="#ff5252", activeforeground="white", padx=30, pady=15, width=25)
     btn_report.pack(pady=10)
@@ -679,7 +679,7 @@ def open_main_window(name):
     root.mainloop()
 
 # Funzione per mostrare gli utenti registrati per lo sport selezionato
-def show_users():
+def visualizza_utenti_console():
     sport = combo_sport.get()
 
     # Connettersi al database
@@ -701,7 +701,7 @@ def show_users():
     conn.close()
 
 # Finestra di registrazione separata
-def open_registration_window():
+def apri_finestra_registrazione():
     reg_window = tk.Toplevel(login_window)
     reg_window.title("Registrazione")
     reg_window.geometry("400x400")
@@ -741,7 +741,7 @@ def open_registration_window():
     
     # Bottone registrati
     btn_reg_submit = tk.Button(reg_window, text="Registrati", 
-                               command=lambda: register_user(combo_reg_level, combo_reg_sport, entry_reg_name, entry_reg_password),
+                               command=lambda: registra_utente(combo_reg_level, combo_reg_sport, entry_reg_name, entry_reg_password),
                                bg="#0d7377", fg="white", font=("Helvetica", 12), activebackground="#14919b", activeforeground="white", padx=20, pady=10)
     btn_reg_submit.pack(pady=20)
 
@@ -775,7 +775,7 @@ entry_password = tk.Entry(login_window, show="*", font=("Helvetica", 12))
 entry_password.pack(pady=5)
 
 # Bottone Accedi
-btn_login = tk.Button(login_window, text="Accedi", command=lambda: login_user(entry_name, entry_password), 
+btn_login = tk.Button(login_window, text="Accedi", command=lambda: accedi_utente(entry_name, entry_password), 
                       bg="#0d7377", fg="white", font=("Helvetica", 12), activebackground="#14919b", activeforeground="white", padx=20, pady=10)
 btn_login.pack(pady=20)
 
@@ -784,7 +784,7 @@ label_or = tk.Label(login_window, text="Oppure", bg="#2e2e2e", fg="white", font=
 label_or.pack(pady=5)
 
 # Bottone Registrati
-btn_register = tk.Button(login_window, text="Registrati", command=open_registration_window,
+btn_register = tk.Button(login_window, text="Registrati", command=apri_finestra_registrazione,
                          bg="#14919b", fg="white", font=("Helvetica", 12), activebackground="#0d7377", activeforeground="white", padx=20, pady=10)
 btn_register.pack(pady=10)
 
